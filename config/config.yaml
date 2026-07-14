@@ -1,0 +1,88 @@
+# =============================================================================
+# Configuracao central do pipeline StatArb L/S - Desafio Quant AI 2026
+# Todos os parametros do projeto vivem aqui. Nada hard-coded nos modulos.
+# =============================================================================
+
+paths:
+  data_raw: data/raw               # dumps brutos (Bloomberg / sintetico)
+  data_processed: data/processed   # painel limpo no schema canonico
+  reports: reports                 # metricas, graficos, tearsheet
+
+data:
+  source: synthetic                # synthetic | bloomberg
+  start: "2018-01-02"              # inicio do painel de dados
+  end: "2024-12-31"
+
+backtest:
+  start: "2020-01-02"              # inicio da simulacao (precisa de historico p/ betas)
+  end: "2024-12-31"
+
+universe:
+  min_price: 1.0                   # evita penny stocks
+  min_adv_usd: 1.0e6               # ADV minimo (USD) para ser negociavel
+  min_history_days: 260            # historico minimo p/ estimar beta/vol
+  membership_ffill_limit_days: 35  # snapshot mensal -> diario (limite do ffill)
+
+book:
+  gross_usd: 1.0e9                 # book bruto: $1 bi ($500mm por perna)
+  # net = 0 por construcao (dollar-neutral no otimizador)
+
+signal:
+  name: earnings_yield             # PLUG-IN ativo. Validacao da esteira via E/P;
+                                   # trocar p/ 'blend' quando o funil aprovar os componentes
+  zscore_cap: 3.0                  # winsorizacao do z-score cross-sectional
+  alpha_bps_per_z: 4.0             # alfa diario esperado (bps) por unidade de z
+  horizon_days: 21                 # horizonte de amortizacao do alfa vs custo de entrada
+                                   # (otimizador de 1 periodo e miope: sem isso ele compara
+                                   #  1 dia de alfa contra o custo TOTAL do trade e nao opera)
+                                   # Guia por sinal: E/P 4bps/21d | idio_reversal 8bps/4d
+                                   #                 blend 6bps/8d (misto rapido+lento)
+  lookback_days: 5                 # (idio_reversal) janela da reversao de curto prazo
+
+signal_params:                     # parametros da biblioteca de sinais (roadmap 3b)
+  trend_factor: {ma_grid: [3, 5, 10, 20, 50, 100, 200, 400], smooth_months: 12, min_names: 50}
+  mad: {short_ma: 21, long_ma: 200}
+  str_turnover: {ret_window: 21, to_window: 21, low_to_quantile: 0.25}
+  resid_ou: {accum_days: 60, z_window: 252}
+  left_tail: {window: 250, min_obs: 200, quantile: 0.01, refresh_days: 21}
+  seasonality: {min_years: 3, max_years: 10}
+
+blend:                             # combinador: alfa = soma(w_k * z_k), re-normalizado
+  components:                      # decidido pelo funil no S&P 500 as-of (13/07):
+    resid_ou: 1.0                  # nucleo robusto (IC21 t~4 dev / t~2 val)
+    str_turnover: 0.5              # diversificador fraco (tilt menor); testar se agrega
+
+funnel:                            # protocolo anti-overfitting (doc de sinais, secao 16)
+  dev_end: "2022-12-31"            # desenvolvimento
+  val_end: "2023-12-31"            # validacao; holdout = 2024+ (uma unica ida,
+  eval_every_days: 5               #   somente com --include-holdout explicito)
+  horizons: [1, 5, 21]             # dias uteis a frente p/ IC (apos lag de execucao)
+
+factors:
+  names: [mkt, smb, hml, rmw, cma, mom]   # FF5 + Momentum
+  beta_window: 252                 # janela da regressao rolling
+  beta_min_obs: 126                # minimo de observacoes validas
+  estimation_every_days: 21        # re-estima betas a cada ~1 mes (betas sao lentos)
+
+risk:
+  cov_window: 252                  # janela da covariancia de fatores
+  risk_aversion: 150.0             # lambda do termo de risco no otimizador
+  factor_exposure_bound: 0.02      # |beta do book| <= 2% do gross, por fator
+  net_tolerance: 0.002             # tolerancia p/ dollar-neutrality (fracao do gross)
+  max_weight: 0.005                # 0.5% do gross por nome (concentracao)
+  liquidity_cap_adv_mult: 1.0      # |posicao| <= 1x ADV do nome
+  participation_cap: 0.05          # |trade diario| <= 5% do ADV do nome
+
+costs:                             # modelo Almgren-Chriss (impacto de mercado)
+  spread_bps: 5.0                  # meio-spread + taxas, em bps do notional
+  ac_eta: 0.5                      # coef. impacto temporario (sqrt-law)
+  ac_gamma: 0.05                   # coef. impacto permanente (linear)
+  adv_window: 21                   # janela (dias) do ADV mediano
+
+execution:
+  lag_days: 1                      # sinal no close de t -> executa no close de t+1 (anti-lookahead)
+  rebalance: daily
+
+hedge:
+  enabled: true
+  instrument: IWM                  # ETF Russell 2000 p/ zerar beta residual de mercado
