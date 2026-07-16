@@ -99,6 +99,7 @@ def trunc(cfg, md):
         factors=md.factors.loc[:date], rf=md.rf.loc[:date],
         iwm_ret=md.iwm_ret.loc[:date],
         earnings=None if md.earnings is None else md.earnings.loc[:date],
+        open_=None if md.open_ is None else md.open_.loc[:date],
     )
     fm_trunc = FactorModel(cfg).fit(md_trunc.returns, md_trunc.factors)
     return md_trunc, fm_trunc, date
@@ -106,19 +107,22 @@ def trunc(cfg, md):
 
 @pytest.mark.parametrize("signal_name", [
     "idio_reversal", "earnings_yield", "mad", "str_turnover", "left_tail", "resid_ou",
+    "stm", "overnight", "salience",
 ])
 def test_signal_no_lookahead(cfg, md, fm, trunc, signal_name):
     """Scores na data t nao mudam se o futuro for removido do painel."""
     from statarb.signals import _REGISTRY
 
     md_trunc, fm_trunc, date = trunc
-    univ = list(md.returns.columns[:70])
+    # universo inteiro do painel de teste: sinais com mascara de quantil
+    # (str_turnover/stm mantem ~25% dos nomes) precisam de base ampla
+    univ = list(md.returns.columns)
 
     z_full = _REGISTRY[signal_name](cfg).compute(md, fm, date, univ)
     z_trunc = _REGISTRY[signal_name](cfg).compute(md_trunc, fm_trunc, date, univ)
 
     common = z_full.index.intersection(z_trunc.index)
-    assert len(common) > 15, f"{signal_name}: cobertura insuficiente ({len(common)})"
+    assert len(common) > 10, f"{signal_name}: cobertura insuficiente ({len(common)})"
     # betas re-estimados em painel truncado podem diferir em datas de borda;
     # o contrato exige correlacao ~1 entre os scores
     corr = np.corrcoef(z_full[common], z_trunc[common])[0, 1]

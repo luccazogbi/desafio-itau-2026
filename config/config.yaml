@@ -43,9 +43,12 @@ signal_params:                     # parametros da biblioteca de sinais (roadmap
   trend_factor: {ma_grid: [3, 5, 10, 20, 50, 100, 200, 400], smooth_months: 12, min_names: 50}
   mad: {short_ma: 21, long_ma: 200}
   str_turnover: {ret_window: 21, to_window: 21, low_to_quantile: 0.25}
+  stm: {ret_window: 21, to_window: 21, high_to_quantile: 0.75}   # Medhat-Schmeling RFS 2022
   resid_ou: {accum_days: 60, z_window: 252}
   left_tail: {window: 250, min_obs: 200, quantile: 0.01, refresh_days: 21}
   seasonality: {min_years: 3, max_years: 10}
+  overnight: {window: 21, min_obs: 15}                           # Lou-Polk-Skouras JFE 2019
+  salience: {theta: 0.1, delta: 0.7, window: 21, refresh_days: 5}  # Cosemans-Frehen JFE 2021 (valores do paper, NAO otimizar)
 
 blend:                             # combinador: alfa = soma(w_k * z_k), re-normalizado
   components:                      # decidido pelo funil no S&P 500 as-of (13/07):

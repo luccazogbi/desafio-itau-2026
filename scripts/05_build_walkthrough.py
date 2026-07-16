@@ -123,9 +123,15 @@ fonte que escreva esse schema, sem alterar uma linha de código a jusante.
 
 Membership as-of resolve o viés de **seleção**; resta o de **dados**: parte dos membros
 que saíram do índice não tem preço no yfinance. Medimos essa cobertura mês a mês
-(está no `meta.json`) — em vez de ignorar o viés, nós o **quantificamos**. *(No Russell
-2000 essa cobertura seria de apenas 18% para as deslistadas — foi por isso que a
-estratégia migrou para o S&P 500; ver `considerações/`.)*
+(está no `meta.json`) — em vez de ignorar o viés, nós o **quantificamos**: entre os
+**removidos** do índice na janela, **46%** têm preço vs **99%** dos sobreviventes
+(`reports/delisted_coverage_sp500.md`). *(No Russell 2000 seria 18% vs 92% — foi por
+isso que a estratégia migrou para o S&P 500; ver `considerações/`.)*
+
+> **Nota — o "gap" no início do gráfico 1.3a não é falta de dados.** É o **warm-up do
+> filtro de histórico**: o universo exige **≥ 260 dias úteis** de histórico (para estimar
+> betas/vol), então de jan/2018 a ~fev/2019 quase nada é elegível. Toda avaliação começa
+> depois do warm-up (`backtest.start = 2020`).
 """)
 
 code("""

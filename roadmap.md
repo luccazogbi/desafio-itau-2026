@@ -51,6 +51,17 @@ beta com **SPY**. Sinal oficial: **`resid_ou`** (reversão de resíduo, Avellane
 
 ## 3. Sinal de Alfa — decidido por evidência
 
+- [ ] Verificar sinais de alfa da literatura para o novo modelo de estratégia que estamos buscando (Big Caps - S&P 500)
+  > Pesquisa 14/07 (Claude): 3 candidatos implementados e TESTADOS no funil
+  > (dev/val, S&P 500 as-of). Veredito: **NENHUM agrega — blend segue descartado.**
+  > Resultados em `reports/funnel.md` e `reports/blend_analysis.md`:
+  - [x] **STM** (Medhat-Schmeling, *RFS* 2022): CORTADO — no nosso universo fator-neutro o efeito INVERTE (IC21 dev −0,057, t −3,6) e é o anti-resid_ou (corr P&L −0,67)
+  - [x] **Overnight** (Lou-Polk-Skouras, *JFE* 2019): CORTADO — IC ≈ 0, inconsistente entre splits (painel ganhou `prices_open` de brinde, script 07c)
+  - [x] **Salience** (Cosemans-Frehen, *JFE* 2021): CORTADO — dev IC21 t 2,8 mas NÃO valida (val t 0,3) e é redundante c/ resid_ou (corr P&L +0,66)
+  - [x] Funil + análise de correlação rodados (scripts 04 e 09) — decisão por evidência
+  > Conclusão: **`resid_ou` segue sendo O sinal.** Sinais novos só com mudança estrutural
+  > (dados pagos, small caps, ou afrouxar neutralidade) — decisão futura c/ orientador.
+
 - [x] 8 candidatos da literatura implementados como plug-ins (`statarb/signals/`)
 - [x] Funil de avaliação (IC 1/5/21d vs retorno residual, quintis, splits dev/val/holdout) — `scripts/04_signal_funnel.py`
 - [x] Funil rodado no S&P 500 as-of → **`resid_ou` é o único robusto** (IC21 t≈4 dev / t≈2 val)

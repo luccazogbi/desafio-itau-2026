@@ -35,3 +35,31 @@ class STRTurnover(PanelSignal):
 
         raw = (-ret).where(to_rank <= q)   # reversao so onde o volume nao validou
         return raw.dropna(how="all")
+
+
+class STM(PanelSignal):
+    """Short-Term Momentum (Medhat & Schmeling, RFS 2022): o outro lado da moeda.
+
+    O retorno do ultimo mes CONTINUA nas acoes de ALTO turnover (o movimento
+    foi validado por volume = informacao, nao fluxo) -- e o paper mostra que o
+    efeito e mais forte justamente nas MAIORES e mais liquidas, sobrevivendo a
+    custos. Nota: NAO e proxy do fator MOM (formacao de 1 mes vs 12-2 do fator;
+    o paper mostra que sobrevive ao controle por UMD).
+
+        score = +retorno_21d   APENAS nos nomes com turnover >= quantil alto
+    """
+
+    name = "stm"
+
+    def _build_panel(self, md, fm) -> pd.DataFrame:
+        p = self.params()
+        rw = int(p.get("ret_window", 21))
+        tw = int(p.get("to_window", 21))
+        q = float(p.get("high_to_quantile", 0.75))
+
+        ret = md.tri.pct_change(rw, fill_method=None)
+        turnover = md.dollar_volume.rolling(tw, min_periods=tw // 2).sum() / md.market_cap
+        to_rank = turnover.rank(axis=1, pct=True)
+
+        raw = ret.where(to_rank >= q)      # momentum so onde o volume validou
+        return raw.dropna(how="all")

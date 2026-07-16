@@ -7,9 +7,12 @@ sem dependencia de Bloomberg):
     trend_factor    Han-Zhou-Zhu 2016: MAs multi-horizonte com pesos aprendidos
     mad             Avramov 2021: MA(21)/MA(200) -- variante do modulo de tendencia
     str_turnover    Medhat-Schmeling 2022: reversao so no quantil de baixo turnover
-    resid_ou        Avellaneda-Lee: desvio acumulado do residuo, z temporal
+    stm             Medhat-Schmeling 2022: MOMENTUM 1m so no quantil de ALTO turnover
+    resid_ou        Avellaneda-Lee: desvio acumulado do residuo, z temporal (SINAL OFICIAL)
     left_tail       Atilgan 2020: momentum de cauda esquerda (VaR 1%)
     seasonality     Keloharju 2016/21: same-month menos outros meses
+    overnight       Lou-Polk-Skouras 2019: persistencia do retorno overnight (close->open)
+    salience        Cosemans-Frehen 2021: dias salientes vs mercado
     blend           combinador -- alfa unico a partir dos componentes do config
 """
 
@@ -17,17 +20,19 @@ from .base import PanelSignal, Signal
 from .blend import BlendSignal
 from .earnings_yield import EarningsYield
 from .left_tail import LeftTail
+from .overnight import Overnight
 from .resid_ou import ResidOU
 from .reversal import IdioReversal
+from .salience import Salience
 from .seasonality import Seasonality
-from .str_turnover import STRTurnover
+from .str_turnover import STM, STRTurnover
 from .trend_factor import MAD, TrendFactor
 
 _REGISTRY = {
     cls.name: cls
     for cls in (
-        IdioReversal, EarningsYield, TrendFactor, MAD, STRTurnover,
-        ResidOU, LeftTail, Seasonality, BlendSignal,
+        IdioReversal, EarningsYield, TrendFactor, MAD, STRTurnover, STM,
+        ResidOU, LeftTail, Seasonality, Overnight, Salience, BlendSignal,
     )
 }
 
