@@ -57,7 +57,7 @@ explica o *porquê* antes do *como*, no espírito do `alpha_signal_research_tuto
         |--> betas       --> restrições do OTIMIZADOR (5) e hedge SPY
         |--> vol idio    --> escala do sinal e termo de risco
         |
- (3) SINAL resid_ou                  desvio acumulado do resíduo, normalizado
+ (3) SINAL resid_ou                  retorno idiossincrático acumulado, normalizado
         |
  (4) VALIDAÇÃO DE PESQUISA           IC, quintis, splits — o sinal prevê?
         |
@@ -223,52 +223,87 @@ ax.legend(); plt.show()
 
 # ============================================================ 3. O sinal
 md("""
-## 3. O sinal oficial: reversão de resíduo com z-score temporal (`resid_ou`)
+## 3. O sinal oficial: `resid_ou` (reversão do retorno idiossincrático)
 
-### 3.1 A tese (Avellaneda & Lee, 2010)
+**De onde viemos:** a seção 2 nos deu, para cada ação e cada dia, o **resíduo** ε — o
+retorno que os fatores *não* explicam. **O que fazemos agora:** transformar esses
+resíduos no sinal de alfa que vai ordenar o universo.
 
-**Arbitragem estatística** no sentido estrito: quando o **desvio acumulado** do resíduo
-de uma ação fica *esticado* em relação ao próprio histórico, ele tende a **reverter à
-média**. A intuição econômica: movimentos idiossincráticos grandes e persistentes sem
-respaldo em fatores costumam ser **sobre-reação** (fluxo, liquidez) — e o preço volta.
+Antes da matemática, vale fixar a anatomia de **qualquer** sinal de alfa. Ele tem três
+camadas, e vamos construí-las nesta ordem:
 
-Dois pontos importantes que os dados nos ensinaram (seção 4.4):
-- a **reversão rápida de 5 dias está morta em large caps** (arbitragem via HFT);
-- a **reversão de resíduo no horizonte de ~1 mês sobrevive** — é ela que operamos.
+1. **A tese** — a *crença econômica* sobre por que algo mensurável antecipa o desempenho futuro;
+2. **A métrica** — o *número por ação* que traduz essa tese em algo calculável;
+3. **O sinal** — a métrica *padronizada entre as ações*, pronta para ranquear o universo.
 
-A preparação do sinal tem **3 passos**, detalhados abaixo.
+### 3.1 A tese
 
-### 3.2 Passo 1 — acumular o desvio
+Tudo começa por uma crença (Avellaneda & Lee, 2010, *arbitragem estatística*):
+
+> Quando uma ação acumula um **retorno idiossincrático** anormalmente grande — um
+> movimento *próprio*, não explicado pelos fatores —, isso costuma ser **sobre-reação a
+> fluxo** (liquidez, rebalanceamento de fundos), não informação nova. E sobre-reação
+> **se desfaz**: esse movimento próprio tende a **reverter à média** no horizonte de ~1 mês.
+
+A lógica do lucro é econômica: um vendedor apressado empurra o preço para longe do
+equilíbrio; quem compra dele **provê liquidez** e é remunerado quando o preço volta.
+Compramos o exagero para baixo e vendemos o exagero para cima.
+
+*Por que ~1 mês?* Os dados (seção 4.4) mostram que a reversão **rápida de 5 dias morreu**
+em large caps (arbitrada por HFT), mas a do horizonte **mensal sobrevive** — é essa que operamos.
+
+### 3.2 A métrica
+
+Para transformar a tese em número, precisamos medir *"quão esticado, e para qual lado,
+está o movimento próprio desta ação"*. Isso se faz em dois passos.
+
+**Passo 1 — Acumular o retorno idiossincrático:**
 
 $$ X_i(t) = \\sum_{k=0}^{J-1} \\varepsilon_{i,\\,t-k} \\qquad (J = 60\\text{ dias úteis}) $$
 
-$X_i$ é o **desvio acumulado**: o quanto a ação andou *por conta própria* nos últimos
-~3 meses. Resíduos diários são ruidosos; o acúmulo revela a tendência idiossincrática.
+$X_i$ é o **retorno idiossincrático acumulado**: o quanto a ação andou *por conta
+própria* nos últimos ~3 meses. Economicamente, é o **afastamento do equilíbrio de
+fatores** que a tese diz que reverte. Resíduos de um único dia são ruído; somá-los revela
+a tendência.
 
-### 3.3 Passo 2 — normalização temporal (estilo Ornstein-Uhlenbeck)
+**Passo 2 — Comparar com o histórico da PRÓPRIA ação:**
 
 $$ s_i(t) = -\\,\\frac{X_i(t) - \\mu_i(t)}{\\sigma_i(t)} $$
 
-onde $\\mu_i$ e $\\sigma_i$ são **média e desvio móveis do próprio $X_i$** (janela
-$W=252$ dias). A pergunta que esse passo responde: *"o desvio ATUAL desta ação está
-esticado em relação ao histórico DELA?"* — cada ação é comparada consigo mesma
-(**normalização temporal**), removendo diferenças de escala entre ações. O sinal
-negativo inverte: desvio muito **acima** da média própria → ação "cara" → **short**;
-muito abaixo → "barata" → **long**. É uma simplificação prática do ajuste por processo
-de **Ornstein-Uhlenbeck** do paper original.
+Aqui $\\mu_i$ e $\\sigma_i$ são a **média e o desvio-padrão móveis do próprio $X_i$**
+(janela $W = 252$ dias). A pergunta respondida é: *"esse acúmulo é grande **para ESTA
+ação**?"* — cada ação vira a sua própria régua, o que remove diferenças de escala (uma
+biotech volátil vs. uma utility calma). O sinal de menos **inverte** o resultado: acúmulo
+muito **acima** do normal dela → esticada para cima → "cara" → candidata a **short**;
+muito **abaixo** → "barata" → **long**.
 
-### 3.4 Passo 3 — z-score cross-sectional winsorizado
+Esse $s_i$ é a **métrica**: um número por ação que já mede o esticamento relativo — mas
+ainda na escala individual de cada uma.
 
-No fim de cada dia, os scores de todas as ações são padronizados **entre si**
-(média 0, desvio 1) e **winsorizados** em ±3 — um outlier não pode dominar o book.
-O resultado é o **z-score final**: positivo = candidata a compra, negativo = venda.
+### 3.3 O sinal
 
-### 3.5 Anti-lookahead
+Falta um passo para a métrica virar sinal: torná-la **comparável entre as ações**.
+
+**Passo 3 — Padronizar no corte transversal (todo dia):** os $s_i$ de todas as ações do
+dia são transformados num **z-score cross-sectional** (média 0, desvio-padrão 1) e
+**winsorizados** em ±3 (nenhum outlier domina o book).
+
+**O resultado é o sinal `resid_ou`:** um número por ação, por dia, entre −3 e +3.
+Positivo = retorno idiossincrático esticado para *baixo* → espera-se a volta para cima →
+**compra**; negativo → **venda**. É esse vetor que alimenta o otimizador (seção 5).
+
+> **Métrica × sinal — a distinção que importa:** a *métrica* ($s_i$, passos 1–2) mede o
+> esticamento de cada ação contra **ela mesma**; o *sinal* (passo 3) coloca todas na
+> **mesma régua** para dizer *quem está mais esticado que quem hoje*. Um book long-short
+> ganha com o **ranking relativo**, não com o nível absoluto — por isso o passo 3 é
+> indispensável.
+
+### 3.4 Anti-lookahead
 
 Por construção, todos os passos usam apenas janelas **para trás** (rolling) e resíduos
-calculados com betas **passados**. O contrato é verificado por teste automatizado
-(`tests/test_pipeline.py::test_signal_no_lookahead[resid_ou]`): o score na data *t* é
-idêntico com ou sem o futuro no painel.
+calculados com betas **passados**. Um teste automatizado
+(`test_signal_no_lookahead[resid_ou]`) confirma: o sinal na data *t* é idêntico com ou
+sem o futuro no painel.
 """)
 
 code("""
@@ -281,12 +316,12 @@ mu = X.rolling(W, min_periods=W // 2).mean()
 sd = X.rolling(W, min_periods=W // 2).std()
 
 fig, ax = plt.subplots()
-X.plot(ax=ax, color=PALETTE["strategy"], label=f"X = residuo acumulado {J}d")
+X.plot(ax=ax, color=PALETTE["strategy"], label=f"X = retorno idiossincratico acumulado ({J}d)")
 mu.plot(ax=ax, color="k", lw=1, label="media movel propria (mu)")
-(mu + sd).plot(ax=ax, color=PALETTE["drawdown"], ls="--", lw=0.8, label="mu +- 1 desvio")
+(mu + sd).plot(ax=ax, color=PALETTE["drawdown"], ls="--", lw=0.8, label="mu +- 1 desvio-padrao")
 (mu - sd).plot(ax=ax, color=PALETTE["drawdown"], ls="--", lw=0.8, label="_")
 ax.fill_between(X.index, mu - sd, mu + sd, alpha=0.08, color=PALETTE["drawdown"])
-ax.set_title(f"3.2/3.3  {tk}: acima da banda = 'esticado' => short; abaixo => long")
+ax.set_title(f"3.2 (metrica)  {tk}: acima da banda = esticado p/ cima => short; abaixo => long")
 ax.legend(); plt.show()
 """)
 
@@ -300,8 +335,8 @@ z = sig.compute(md_r, fm_r, d, univ)
 fig, ax = plt.subplots()
 z.hist(bins=40, ax=ax, color=PALETTE["strategy"], alpha=0.85)
 ax.axvline(0, color="k", lw=0.8)
-ax.set_title(f"3.4  z-scores finais em {d:%Y-%m-%d} ({len(z)} acoes, cap +-3)")
-ax.set_xlabel("z (positivo = barata vs proprio historico = long)")
+ax.set_title(f"3.3 (sinal)  z-scores finais em {d:%Y-%m-%d} ({len(z)} acoes, cap +-3)")
+ax.set_xlabel("z (positivo = esticada p/ baixo vs proprio historico = long)")
 plt.show()
 
 print("5 mais 'baratas' (long): ", ", ".join(z.nlargest(5).index))
@@ -398,8 +433,9 @@ md("""
 ## 5. Do sinal ao portfólio: o otimizador convexo
 
 O z-score vira **retorno esperado**: $\\alpha_i = z_i \\times$ (bps por unidade de z)
-$\\times$ (horizonte de ~21 dias — a posição rende até o desvio fechar, e esse acumulado
-compete com o **custo de entrada**, pago uma vez). A cada rebalanceamento resolve-se:
+$\\times$ (horizonte de ~21 dias — a posição rende até a reversão se completar, e esse
+retorno acumulado compete com o **custo de entrada**, pago uma vez). A cada
+rebalanceamento resolve-se:
 
 $$ \\max_w \\;\\; \\alpha'w \\;-\\; \\lambda\\,(w'\\Sigma w) \\;-\\; \\text{custo}_{AC}(w - w_{prev}) $$
 
@@ -588,8 +624,10 @@ md("""
 | **Fator / beta** | movimento coletivo (mercado, valor, momentum...) / sensibilidade a ele |
 | **Resíduo (idiossincrático)** | o pedaço do retorno que os fatores não explicam |
 | **Composição as-of** | o índice como era em cada data (mata o viés de sobrevivência) |
-| **Reversão à média** | tendência de desvios esticados voltarem ao normal |
-| **z-score temporal** | desvio medido contra o histórico da própria ação |
+| **Reversão à média** | tendência de valores esticados voltarem ao nível normal |
+| **Retorno idiossincrático acumulado** | soma dos resíduos numa janela; o quanto a ação andou "por conta própria" |
+| **Métrica × sinal** | métrica = número por ação (contra si mesma); sinal = métrica padronizada entre as ações |
+| **z-score temporal** | medida padronizada de uma ação contra o próprio histórico |
 | **z-score cross-sectional** | padronização entre ações no mesmo dia (média 0, dp 1) |
 | **IC** | correlação sinal → retorno futuro; 0,03–0,05 já é bom |
 | **Dev / validação / holdout** | janelas separadas p/ evitar overfitting; holdout = uma ida |
