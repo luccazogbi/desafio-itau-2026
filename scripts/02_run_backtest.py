@@ -41,6 +41,8 @@ def _cli_overrides(cfg) -> str:
             cfg["paths"]["data_processed"] = "data/" + args[i + 1]
         elif a == "--bt-start":
             cfg["backtest"]["start"] = args[i + 1]
+        elif a == "--bt-end":     # ex.: --bt-end 2023-12-31 (tranca o holdout)
+            cfg["backtest"]["end"] = args[i + 1]
     return tag
 
 

@@ -28,15 +28,17 @@ book:
   # net = 0 por construcao (dollar-neutral no otimizador)
 
 signal:
-  name: earnings_yield             # PLUG-IN ativo. Validacao da esteira via E/P;
-                                   # trocar p/ 'blend' quando o funil aprovar os componentes
+  name: resid_ou                   # SINAL OFICIAL (decidido pelo funil em 13-14/07;
+                                   # 3 candidatos extras testados e cortados)
   zscore_cap: 3.0                  # winsorizacao do z-score cross-sectional
-  alpha_bps_per_z: 4.0             # alfa diario esperado (bps) por unidade de z
+  alpha_bps_per_z: 3.0             # alfa diario esperado (bps) por unidade de z
+                                   # calibrado a priori: alpha ~ IC x vol_idio
+                                   # (IC~0.02, vol idio diaria ~1.5% => ~3bps);
+                                   # 5bps deixava o otimizador superconfiante -> giro 25x/ano
   horizon_days: 21                 # horizonte de amortizacao do alfa vs custo de entrada
                                    # (otimizador de 1 periodo e miope: sem isso ele compara
                                    #  1 dia de alfa contra o custo TOTAL do trade e nao opera)
-                                   # Guia por sinal: E/P 4bps/21d | idio_reversal 8bps/4d
-                                   #                 blend 6bps/8d (misto rapido+lento)
+                                   # Guia por sinal: resid_ou 5bps/21d | E/P 4/21 | idio_reversal 8/4
   lookback_days: 5                 # (idio_reversal) janela da reversao de curto prazo
 
 signal_params:                     # parametros da biblioteca de sinais (roadmap 3b)
@@ -71,6 +73,9 @@ risk:
   cov_window: 252                  # janela da covariancia de fatores
   risk_aversion: 150.0             # lambda do termo de risco no otimizador
   factor_exposure_bound: 0.02      # |beta do book| <= 2% do gross, por fator
+  sector_net_bound: 0.05           # |net por setor| <= 5% do gross (residuo FF nao
+                                   #   remove industria -- sem isso o book poderia
+                                   #   virar aposta setorial disfarcada)
   net_tolerance: 0.002             # tolerancia p/ dollar-neutrality (fracao do gross)
   max_weight: 0.005                # 0.5% do gross por nome (concentracao)
   liquidity_cap_adv_mult: 1.0      # |posicao| <= 1x ADV do nome
@@ -84,7 +89,8 @@ costs:                             # modelo Almgren-Chriss (impacto de mercado)
 
 execution:
   lag_days: 1                      # sinal no close de t -> executa no close de t+1 (anti-lookahead)
-  rebalance: daily
+  rebalance_every_days: 3          # decisao a cada 3 dias uteis: coerente com sinal
+                                   # de horizonte ~21d (score quase nao muda em 1 dia)
 
 hedge:
   enabled: true

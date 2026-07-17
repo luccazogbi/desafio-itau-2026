@@ -44,6 +44,7 @@ def optimize_weights(
     w_prev: np.ndarray,      # (n,) pesos atuais (fracao do gross)
     cost_model,
     cfg: dict,
+    sectors: np.ndarray | None = None,  # (n,) rotulos de setor (str); None = sem restricao
 ) -> np.ndarray | None:
     import cvxpy as cp
 
@@ -88,6 +89,17 @@ def optimize_weights(
         cp.abs(dw) <= t_cap,
     ]
 
+    # NEUTRALIDADE SETORIAL: o residuo FF5+MOM nao remove comovimento de
+    # industria; sem este limite o book poderia virar aposta setorial disfarcada
+    S = sec_eff = None
+    if sectors is not None:
+        _, sec_idx = np.unique(np.asarray(sectors), return_inverse=True)
+        S = np.zeros((n, sec_idx.max() + 1))
+        S[np.arange(n), sec_idx] = 1.0
+        sb = float(r.get("sector_net_bound", 0.05))
+        sec_eff = np.minimum(np.maximum(sb, 0.5 * np.abs(S.T @ w_prev)), 0.15)
+        constraints.append(cp.abs(S.T @ w) <= sec_eff)
+
     prob = cp.Problem(objective, constraints)
     for solver in SOLVERS:
         try:
@@ -101,16 +113,20 @@ def optimize_weights(
             out[np.abs(out) < 1e-6] = 0.0
             # PORTAO DE VIABILIDADE: status 'inaccurate' pode devolver solucao
             # que viola as restricoes de verdade. Nunca deixar isso entrar no book.
-            if _is_feasible(out, w_prev, B, eps, w_cap, t_cap, net_tol):
+            if _is_feasible(out, w_prev, B, eps, w_cap, t_cap, net_tol, S, sec_eff):
                 return out
     return None  # caller mantem w_prev
 
 
 def _is_feasible(
     w: np.ndarray, w_prev: np.ndarray, B: np.ndarray, eps: np.ndarray | float,
-    w_cap: np.ndarray, t_cap: np.ndarray, net_tol: float, tol: float = 5e-3,
+    w_cap: np.ndarray, t_cap: np.ndarray, net_tol: float,
+    S: np.ndarray | None = None, sec_bound: np.ndarray | None = None,
+    tol: float = 5e-3,
 ) -> bool:
     """Confere as restricoes do mandato com folga numerica pequena."""
+    if S is not None and not np.all(np.abs(S.T @ w) <= sec_bound + tol):
+        return False
     if not np.all(np.isfinite(w)):
         return False
     checks = (

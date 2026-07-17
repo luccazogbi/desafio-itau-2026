@@ -53,6 +53,9 @@ class BacktestEngine:
         pending: dict[pd.Timestamp, pd.Series] = {}
         rows, targets_hist = [], {}
         n_fail = 0
+        # sinais lentos nao precisam de decisao diaria: reduz giro/custo sem
+        # perder informacao (ex.: resid_ou tem autocorrelacao de score ~0.9)
+        every = int(cfg["execution"].get("rebalance_every_days", 1))
 
         for i, d in enumerate(dates):
             # ---------- 1) P&L do dia com os pesos carregados
@@ -85,7 +88,7 @@ class BacktestEngine:
                 hedge = self._rehedge(fm, d, w) if self.hedge_on else 0.0
 
             # ---------- 3) decisao no close de d p/ execucao em d+lag
-            if i + self.lag < len(dates):
+            if i % every == 0 and i + self.lag < len(dates):
                 tgt = self._decide(md, fm, signal, mask, d, w)
                 if tgt is not None:
                     exec_date = dates[i + self.lag]
@@ -105,6 +108,7 @@ class BacktestEngine:
                 "gross": float(w.abs().sum()), "net": float(w.sum()),
                 "turnover": turnover, "n_positions": int((w != 0).sum()),
                 "hedge_w": hedge,
+                "max_sector_net": self._max_sector_net(md, w),
                 **{f"expo_{k}": v for k, v in expo.items()},
             })
 
@@ -147,9 +151,12 @@ class BacktestEngine:
         adv = md.adv.loc[d].reindex(names).values
         w_prev = w_cur.reindex(names).fillna(0.0).values
 
+        sectors = md.sectors.reindex(names).fillna("Unknown").values
+
         w_new = optimize_weights(
             alpha=alpha, B=B, F_chol=F_chol, ivol=ivol, sigma_total=sigma,
             adv=adv, w_prev=w_prev, cost_model=self.cost_model, cfg=self.cfg,
+            sectors=sectors,
         )
         if w_new is None:
             return None
@@ -172,3 +179,10 @@ class BacktestEngine:
         common = w.index.intersection(B.index)
         expo = B.loc[common].mul(w.reindex(common), axis=0).sum()
         return expo.to_dict()
+
+    def _max_sector_net(self, md, w) -> float:
+        """Maior |exposicao liquida| a um setor no book corrente (monitoracao)."""
+        if len(w) == 0:
+            return 0.0
+        sec = md.sectors.reindex(w.index).fillna("Unknown")
+        return float(w.groupby(sec).sum().abs().max())

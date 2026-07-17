@@ -64,8 +64,10 @@ def _opt_inputs(cfg, md, fm, date):
 def test_optimizer_neutrality_and_caps(cfg, md, fm):
     date = md.returns.index[-5]
     names, alpha, B, F_chol, ivol, sigma, adv = _opt_inputs(cfg, md, fm, date)
+    rng = np.random.default_rng(1)
+    sectors = rng.choice(["Tech", "Fin", "Health", "Energy", "Cons"], len(names))
     w = optimize_weights(alpha, B, F_chol, ivol, sigma, adv,
-                         np.zeros(len(names)), ACCostModel(cfg), cfg)
+                         np.zeros(len(names)), ACCostModel(cfg), cfg, sectors=sectors)
     assert w is not None, "otimizador nao encontrou solucao"
     r = cfg["risk"]
     assert abs(w.sum()) <= r["net_tolerance"] + 1e-6          # dollar-neutral
@@ -75,6 +77,8 @@ def test_optimizer_neutrality_and_caps(cfg, md, fm):
     G = float(cfg["book"]["gross_usd"])
     t_cap = r["participation_cap"] * np.maximum(adv, 1e5) / G
     assert (np.abs(w) <= t_cap + 1e-8).all()                  # participacao (w_prev=0)
+    for s in np.unique(sectors):                              # neutralidade setorial
+        assert abs(w[sectors == s].sum()) <= r["sector_net_bound"] + 1e-6
 
 
 def test_cost_model_convex_and_monotone(cfg):

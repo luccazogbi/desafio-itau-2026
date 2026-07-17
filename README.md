@@ -1,67 +1,71 @@
-# StatArb L/S Russell 2000 — Desafio Quant AI 2026 (Itaú Asset)
+# StatArb L/S no S&P 500 as-of — Desafio Quant AI 2026 (Itaú Asset)
 
-Estratégia de arbitragem estatística long-short em small caps americanas:
-book de **$1 bi** dollar-neutral ($500mm por perna), neutro aos fatores
-**FF5 + Momentum**, com otimização convexa (**cvxpy**), custos de execução
-**Almgren-Chriss** e hedge de beta residual com **IWM**.
+Arbitragem estatística *long-short* no **S&P 500 com composição histórica as-of**
+(sem viés de sobrevivência): book de **$1 bi dollar-neutral** (~$500mm por perna),
+neutro aos fatores **FF5+Momentum** e a **setores**, otimização convexa (**cvxpy**),
+custos de execução **Almgren-Chriss**, hedge de beta com **SPY**.
 
-> Documentação completa do funcionamento: [docs/PIPELINE.md](docs/PIPELINE.md)
-> **Walkthrough didático com gráficos**: [notebooks/pipeline_walkthrough.ipynb](notebooks/pipeline_walkthrough.ipynb)
->   (gerado por `scripts/05_build_walkthrough.py`; abrir com o kernel "Python (QuantAI 2026)")
-> Log de uso de IA Generativa (critério de 15% do desafio): [docs/genai_log.md](docs/genai_log.md)
-> Lista de tarefas viva: [roadmap.md](roadmap.md)
+**Sinal oficial:** `resid_ou` — reversão à média do resíduo idiossincrático
+(Avellaneda & Lee, 2010), escolhido por evidência num funil de 11 candidatos
+com splits dev/validação/holdout.
 
-## Ambiente (importante)
+> 📓 **Documento vivo do projeto**: [notebooks/pipeline_walkthrough.ipynb](notebooks/pipeline_walkthrough.ipynb)
+> (passo a passo com gráficos; kernel "Python (QuantAI 2026)"; dúvidas em `notebooks/doubts.md`)
+> 📋 Tarefas: [roadmap.md](roadmap.md) · 🤖 Log de GenAI (15% da nota): [docs/genai_log.md](docs/genai_log.md)
+> 📤 Enviar para o GitHub: [COMO_ENVIAR_GITHUB.md](COMO_ENVIAR_GITHUB.md)
+> ⚖️ Por que S&P 500 e não Russell 2000: [considerações/](considerações/)
 
-O projeto vive em pasta sincronizada pelo OneDrive; o venv fica **fora** dela
-(`C:\Users\<user>\.venvs\quant_ai_2026`) — venv dentro de pasta sincronizada
-corrompe (o OneDrive mexe nos milhares de arquivos do ambiente).
+## Ambiente
+
+Venv **fora** da pasta do projeto (evita corrupção por sync):
 
 ```powershell
-# atalho usado nos comandos abaixo
 $py = "$env:USERPROFILE\.venvs\quant_ai_2026\Scripts\python.exe"
-
-# 1. ambiente (uma vez)
-python -m venv $env:USERPROFILE\.venvs\quant_ai_2026
-& $py -m pip install -r requirements.txt
-
-# 2. dados sinteticos (validacao do pipeline; Bloomberg vem depois)
-& $py scripts\00_make_synthetic.py
-
-# 3. backtest completo + tearsheet em reports/  (~4 min)
-& $py scripts\02_run_backtest.py
-
-# 4. validacao cruzada do P&L com a biblioteca bt
-& $py scripts\03_bt_crosscheck.py
-
-# testes de sanidade (anti-lookahead, neutralidade, custos)
-& $py -m pytest tests -q
+# setup (uma vez): python -m venv $env:USERPROFILE\.venvs\quant_ai_2026
+#                  & $py -m pip install -r requirements.txt
 ```
 
-## Com dados reais (na máquina com terminal Bloomberg)
+## Fluxo de trabalho (dados reais, S&P 500 as-of)
 
 ```powershell
-& $py -m pip install blpapi --index-url=https://blpapi.bloomberg.com/repository/releases/python/simple/
-& $py -m pip install xbbg
-& $py scripts\01_pull_bloomberg.py    # grava o schema canonico em data/processed
-# depois: data.source: bloomberg no config/config.yaml e rodar o backtest
+# dados: composicao as-of + precos/volume/abertura + mcap/setor (uma vez)
+& $py scripts\07_pull_sp500_asof.py
+& $py scripts\07b_add_marketcap_sp500.py
+& $py scripts\07c_add_open_sp500.py
+
+# pesquisa de sinais: funil (IC/quintis, splits dev/val) e correlacoes p/ blend
+& $py scripts\04_signal_funnel.py resid_ou --data processed_sp500
+& $py scripts\09_blend_analysis.py --data processed_sp500
+
+# BACKTEST OFICIAL (dev+val 2020-2023; holdout 2024+ trancado)
+& $py scripts\02_run_backtest.py --data processed_sp500 --bt-end 2023-12-31 --tag sp500_dev_val
+
+# notebook explicativo (gera + executa com graficos)
+& $py scripts\05_build_walkthrough.py
+
+# testes de sanidade (anti-lookahead de 9 sinais, neutralidades, custos)
+& $py -m pytest tests -q
 ```
 
 ## Estrutura
 
 ```
-config/config.yaml    <- todos os parametros do projeto
-statarb/              <- pacote: data, factors, signals, risk, costs, portfolio, backtest
-scripts/              <- 00 sintetico | 01 bloomberg | 02 backtest | 03 crosscheck bt
-tests/                <- sanidade: neutralidade, convexidade, anti-lookahead, smoke
-docs/                 <- PIPELINE.md (funcionamento) + genai_log.md
-reports/              <- metricas, graficos, pesos-alvo (gerados)
+config/config.yaml    <- TODOS os parametros (sinal ativo, mandato, custos, splits)
+statarb/              <- pacote: data, factors, signals (11 plug-ins), risk, costs,
+                         portfolio (otimizador), backtest (motor proprio)
+scripts/              <- 00 sintetico | 02 backtest | 04 funil | 05 notebook
+                         07x painel S&P500 as-of | 08 estudo deslistadas | 09 blend
+notebooks/            <- pipeline_walkthrough.ipynb (documento vivo) + doubts.md
+docs/                 <- genai_log.md | arquivo/ (documentos historicos)
+considerações/        <- justificativas metodologicas (universo, vieses)
+data/ reports/        <- gerados pelos scripts (fora do git)
 ```
 
-## Trocar o sinal (o plug-in do pipeline)
+## Decisões-chave (não reabrir sem motivo novo)
 
-1. Criar `statarb/signals/meu_sinal.py` com uma subclasse de `Signal`;
-2. Registrar em `statarb/signals/__init__.py`;
-3. Apontar `signal.name` no `config/config.yaml`.
-
-Nada mais muda — otimizador, custos, hedge e backtest são agnósticos ao sinal.
+1. **Universo S&P 500 as-of** — R2000 gratuito tem survival bias severo (medido:
+   18% de cobertura das deslistadas vs 92%); ver `considerações/`.
+2. **Sinal único `resid_ou`** — funil de 11 candidatos: é o único com IC robusto
+   nos dois splits; blend testado 2× e descartado (não agrega).
+3. **Sem Bloomberg** até etapas futuras do desafio — fontes: Wikipedia/fja05680
+   (membership), yfinance (preços), Ken French (fatores), Nasdaq screener (mcap/setor).

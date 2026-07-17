@@ -1,14 +1,14 @@
-"""Aumenta o painel S&P 500 as-of com market cap (destrava o sinal str_turnover).
+"""Aumenta o painel S&P 500 as-of com market cap + SETOR (screener Nasdaq).
 
-O painel de 07_pull_sp500_asof.py gravou market_cap = NaN (nao era preciso p/ a
-reversao). O str_turnover precisa de turnover = volume$ / market cap. Aqui
-construimos um market cap PROXY, coerente com o metodo ja usado no projeto
-(script 06): market cap atual (screener Nasdaq) escalado pelo caminho do preco.
+Market cap (proxy p/ turnover): mcap atual escalado pelo caminho do preco,
     market_cap_t = close_t * (market_cap_hoje / close_hoje)
 
-Membros que ja sairam do indice e nao estao no screener de hoje ficam com NaN
-(o str_turnover simplesmente os ignora naquele ranking -- minoria, aceitavel).
-So sobrescreve market_cap.parquet; nao repuxa precos.
+Setor: usado pela RESTRICAO DE NEUTRALIDADE SETORIAL do otimizador -- o residuo
+FF5+MOM nao tem fator de industria, entao sem essa restricao o book poderia
+acumular apostas setoriais disfarcadas. Removidos fora do screener de hoje
+ficam "Unknown" (vira um balde proprio na restricao).
+
+Sobrescreve market_cap.parquet e sectors.parquet; nao repuxa precos.
 """
 
 from __future__ import annotations
@@ -53,7 +53,17 @@ def main() -> None:
     market_cap[have.index] = close[have.index].mul(have / px_now, axis=1)
 
     market_cap.rename_axis("date").to_parquet(panel / "market_cap.parquet")
-    print(f"OK -> {panel / 'market_cap.parquet'} | cobertura {market_cap.iloc[-1].notna().mean():.0%}")
+    print(f"market_cap: cobertura {market_cap.iloc[-1].notna().mean():.0%}")
+
+    # setores para a restricao de neutralidade setorial
+    sec_now = scr.set_index("sym")["sector"].replace("", pd.NA)
+    sectors = sec_now.reindex(cols).fillna("Unknown").rename("sector").to_frame()
+    sectors.index.name = "ticker"
+    sectors.to_parquet(panel / "sectors.parquet")
+    n_known = int((sectors["sector"] != "Unknown").sum())
+    print(f"sectors: {n_known}/{len(cols)} com setor ({sectors['sector'].nunique()} baldes) "
+          f"| Unknown = {len(cols) - n_known}")
+    print(f"OK -> {panel}")
 
 
 if __name__ == "__main__":

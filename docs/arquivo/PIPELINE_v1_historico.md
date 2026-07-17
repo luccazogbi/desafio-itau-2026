@@ -1,3 +1,8 @@
+> **[ARQUIVADO em 15/07/2026]** Documento da fase inicial do projeto (universo Russell 2000,
+> hedge IWM, plano de blend). Superado pelas decisoes posteriores: universo S&P 500 as-of,
+> hedge SPY, sinal unico resid_ou. O documento VIVO do pipeline e o notebook
+> `notebooks/pipeline_walkthrough.ipynb`. Mantido apenas como historico.
+
 # Pipeline StatArb Long-Short — Documentação de Funcionamento
 
 **Projeto:** Desafio Itaú Asset Quant AI 2026

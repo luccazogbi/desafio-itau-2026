@@ -69,19 +69,27 @@ beta com **SPY**. Sinal oficial: **`resid_ou`** (reversão de resíduo, Avellane
 - [x] Notebook explicativo focado no `resid_ou`, passo a passo (`notebooks/pipeline_walkthrough.ipynb`)
 - [ ] (fino) Sensibilidade dos parâmetros do `resid_ou` (acúmulo J=60d, janela z W=252d) — sem overfitar
 
-## 4. Backtest & Validação — PRÓXIMO GRANDE PASSO
+## 4. Backtest & Validação
 
-- [ ] **Rodar o backtest oficial do `resid_ou`** no S&P 500 as-of (dev+val; holdout trancado)
-- [ ] Métricas: Sharpe líquido, turnover, drawdown, decomposição de custos (gross → net)
-- [ ] Confirmar neutralidade de fatores e eficácia do hedge SPY nos dados reais
-- [ ] Análise de capacidade (alfa líquido × tamanho do book)
+> **1ª rodada oficial dev+val concluída em 15/07** (`reports/sp500_dev_val/`, seção 7 do
+> notebook): Sharpe bruto 0,53 / líquido 0,20, turnover 15×/ano, custos 198 bps/ano,
+> gross ~1,0, |net| ≤ 0,002, |net setorial| ≤ 0,05 ✓. Calibração a priori feita UMA vez
+> (α=3bps/z ≈ IC×vol_idio; rebalance a cada 3d, coerente com horizonte 21d) — sem caça
+> ao Sharpe. Nota: max_abs_factor_expo alto (0,59) é ARTEFATO de medição na crise
+> COVID (betas re-estimados explodem em mar-abr/2020); no dia a dia |expo_mkt| ~0,015.
+- [x] **Backtest oficial do `resid_ou`** no S&P 500 as-of (dev+val; holdout trancado)
+- [x] Métricas: Sharpe líquido, turnover, drawdown, decomposição de custos (gross → net)
+- [x] Confirmar neutralidade de fatores + SETORIAL e hedge SPY nos dados reais
+- [ ] **Análise de capacidade** (alfa líquido × tamanho do book) — custos comem 63% do
+      bruto em $1bi; book menor deve reter muito mais → análise-chave p/ o relatório
 - [ ] Cenários de crise (queda de 2020, bear de 2022) — análise honesta
 - [ ] Crosscheck `bt` nos dados reais
 - [ ] Ida única ao **holdout** (2024+) — número final da estratégia
 
 ## 5. Otimização & Custos — calibração final
 
-- [ ] Calibrar `risk_aversion`, caps e `alpha_bps_per_z`/`horizon_days` no universo real
+- [x] Restrição de **neutralidade setorial** no otimizador (|net por setor| ≤ 5%) + setores reais no painel
+- [x] Calibração a priori de `alpha_bps_per_z` (3) e `rebalance_every_days` (3) — justificadas, sem grid search
 - [ ] Calibrar η, γ e spread com ADV/volatilidade reais do S&P 500
 - [ ] (opcional avançado) otimização multi-período (Gârleanu-Pedersen) vs. horizonte heurístico
 

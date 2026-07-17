@@ -63,7 +63,7 @@ explica o *porquê* antes do *como*, no espírito do `alpha_signal_research_tuto
         |
  (5) OTIMIZADOR + (6) CUSTOS         do score à carteira executável
         |
- (7) PRÓXIMOS PASSOS                 backtest oficial (ainda não rodado)
+ (7) BACKTEST OFICIAL                resid_ou no S&P 500 as-of (dev+val; holdout trancado)
 ```
 """)
 
@@ -128,10 +128,14 @@ que saíram do índice não tem preço no yfinance. Medimos essa cobertura mês 
 (`reports/delisted_coverage_sp500.md`). *(No Russell 2000 seria 18% vs 92% — foi por
 isso que a estratégia migrou para o S&P 500; ver `considerações/`.)*
 
-> **Nota — o "gap" no início do gráfico 1.3a não é falta de dados.** É o **warm-up do
-> filtro de histórico**: o universo exige **≥ 260 dias úteis** de histórico (para estimar
-> betas/vol), então de jan/2018 a ~fev/2019 quase nada é elegível. Toda avaliação começa
-> depois do warm-up (`backtest.start = 2020`).
+#### ⚠️ Nota sobre o "gap" no início do gráfico 1.3a
+
+O trecho inicial baixo **não é falta de dados** — é o **warm-up do filtro de histórico**.
+O universo exige **pelo menos 260 dias úteis de histórico** por ação (mínimo para estimar
+betas e vol com confiança); como o painel começa em jan/2018, quase nada é elegível até
+~fev/2019. Toda avaliação começa **depois** do warm-up (`backtest.start = 2020`).
+O mesmo explica degraus ao longo da curva: quem entra no índice só vira "negociável"
+260 dias úteis depois de ter preço.
 """)
 
 code("""
@@ -404,6 +408,7 @@ $$ \\max_w \\;\\; \\alpha'w \\;-\\; \\lambda\\,(w'\\Sigma w) \\;-\\; \\text{cust
 | $\\lvert\\sum_i w_i\\rvert \\le 0{,}002$ | **dollar-neutral**: ~$500mm long, ~$500mm short |
 | $\\lVert w \\rVert_1 \\le 1$ | orçamento bruto de $1 bi |
 | $\\lvert B'w \\rvert \\le 0{,}02$ | **neutralidade a cada fator** — o retorno vem do resíduo, não de apostas em mercado/valor/momentum |
+| $\\lvert \\sum_{i \\in setor} w_i \\rvert \\le 5\\%$ | **neutralidade setorial** — o resíduo FF não remove indústria; sem isso o book viraria aposta setorial disfarçada |
 | $\\lvert w_i \\rvert \\le \\min(0{,}5\\%,\\, ADV_i/G)$ | concentração + liquidez |
 | $\\lvert \\Delta w_i \\rvert \\le 5\\%\\, ADV_i/G$ | participação máxima no volume diário |
 
@@ -431,11 +436,14 @@ F_chol = factor_cov_chol(md_r.factors, d, 252)
 sigma = total_vol(B, F_chol, ivol)
 adv = md_r.adv.loc[d].reindex(names).values
 
+sectors_d = md_r.sectors.reindex(names).fillna("Unknown").values
 w = optimize_weights(alpha=alpha, B=B, F_chol=F_chol, ivol=ivol, sigma_total=sigma,
                      adv=adv, w_prev=np.zeros(len(names)),
-                     cost_model=ACCostModel(cfg), cfg=cfg)
+                     cost_model=ACCostModel(cfg), cfg=cfg, sectors=sectors_d)
 ws = to_series(w, names)
+sec_net = pd.Series(w, index=names).groupby(pd.Series(sectors_d, index=names)).sum()
 print(f"posicoes: {(ws != 0).sum()} | gross: {ws.abs().sum():.3f} do book | net: {ws.sum():+.5f}")
+print(f"maior |net setorial|: {sec_net.abs().max():.3f} (limite 0.05) -- neutralidade setorial OK")
 
 expo = pd.Series(B.T @ w, index=list(md_r.factors.columns))
 fig, axes = plt.subplots(1, 2, figsize=(14, 5))
@@ -482,28 +490,97 @@ ax.set_xlabel("participacao no volume diario (%)"); ax.set_ylabel("bps"); ax.leg
 plt.show()
 """)
 
-# ============================================================ 7. Fecho
+# ============================================================ 7. Backtest oficial
 md("""
-## 7. Estado, próximos passos e glossário
+## 7. O backtest oficial: `resid_ou` no S&P 500 as-of (dev+val)
 
-### 7.1 O que já está validado
+**De onde viemos:** sinal validado em pesquisa (IC, seção 4) e carteira bem definida
+(otimizador + custos, seções 5–6). **O que fazemos aqui:** a simulação completa e
+oficial — sinal → otimizador (com TODAS as restrições, inclusive a **setorial**) →
+custos Almgren-Chriss → execução t+1 → hedge SPY → P&L dia a dia.
+
+**Janela: 2020 → 2023 (dev+validação). O holdout (2024+) permanece TRANCADO** — será
+usado uma única vez, na decisão final (protocolo anti-overfitting).
+
+*Os resultados abaixo são lidos de `reports/sp500_dev_val/` (gerados por
+`scripts/02_run_backtest.py --data processed_sp500 --bt-end 2023-12-31 --tag sp500_dev_val`).*
+""")
+
+code("""
+import json as _json
+REP = ROOT / "reports" / "sp500_dev_val"
+res_bt = pd.read_parquet(REP / "results_daily.parquet")
+m_bt = _json.loads((REP / "metrics.json").read_text(encoding="utf-8"))
+
+resumo = pd.Series({
+    "Sharpe bruto": m_bt["sharpe_gross"], "Sharpe liquido": m_bt["sharpe_net"],
+    "Retorno liquido (% a.a. do gross)": m_bt["ann_return_net_pct"],
+    "Vol (% a.a.)": m_bt["ann_vol_pct"], "Max drawdown (%)": m_bt["max_drawdown_pct"],
+    "Turnover (x gross/ano)": m_bt["ann_turnover_x"],
+    "Custos (bps do gross/ano)": m_bt["costs_bps_of_gross_per_year"],
+    "Gross medio": m_bt["avg_gross"], "|Net| maximo": m_bt["max_abs_net"],
+    "Max |expo fator|": m_bt["max_abs_factor_expo"],
+    "Max |net setorial|": float(res_bt["max_sector_net"].max()) if "max_sector_net" in res_bt else float("nan"),
+    "Posicoes (media)": m_bt["avg_n_positions"],
+    "P&L liquido acumulado (USD mm)": m_bt["pnl_net_total_usd_mm"],
+}).round(3)
+resumo.to_frame("valor")
+""")
+
+code("""
+G_ = 1e9
+eq_bt = pd.DataFrame({
+    "resid_ou (net)": (1 + res_bt["pnl_net_usd"] / G_).cumprod(),
+    "Cash (RF)": (1 + md_r.rf.reindex(res_bt.index).fillna(0)).cumprod(),
+    "SPY": (1 + md_r.iwm_ret.reindex(res_bt.index).fillna(0)).cumprod(),
+})
+fig, axes = plt.subplots(2, 2, figsize=(14, 8))
+eq_bt.plot(ax=axes[0, 0], color=[PALETTE["strategy"], PALETTE["benchmark"], PALETTE["iwm"]])
+axes[0, 0].set_title("7a  Curva de capital (base 1.0) -- book neutro se compara com CASH")
+
+cum = res_bt["pnl_net_usd"].cumsum() / G_ * 100
+(cum - cum.cummax()).plot(ax=axes[0, 1], color=PALETTE["drawdown"])
+axes[0, 1].set_title("7b  Drawdown (% do gross)")
+
+expo_cols = [c for c in res_bt.columns if c.startswith("expo_")]
+res_bt[expo_cols].rename(columns=lambda c: c[5:]).plot(ax=axes[1, 0], lw=0.8)
+axes[1, 0].set_title("7c  Exposicao a fatores (prova da neutralidade)")
+
+(res_bt[["pnl_long_usd", "pnl_short_usd", "pnl_hedge_usd"]].cumsum() / 1e6).rename(
+    columns={"pnl_long_usd": "long", "pnl_short_usd": "short", "pnl_hedge_usd": "hedge SPY"}
+).plot(ax=axes[1, 1], color=[PALETTE["long"], PALETTE["short"], PALETTE["benchmark"]])
+axes[1, 1].set_title("7d  P&L acumulado por perna (USD mm)")
+plt.tight_layout(); plt.show()
+
+daily_net = res_bt["pnl_net_usd"] / G_
+by_year = daily_net.groupby(res_bt.index.year).apply(lambda x: (x.mean()*252*100, x.mean()/x.std()*np.sqrt(252)))
+print("Por ano (ret liq % a.a. | Sharpe):")
+for y, (r_, s_) in by_year.items():
+    print(f"  {y}: {r_:+6.2f}%  |  {s_:+.2f}")
+""")
+
+# ============================================================ 8. Fecho
+md("""
+## 8. Estado, próximos passos e glossário
+
+### 8.1 O que já está validado
 
 1. **Pipeline**: recuperou alfa plantado em painel sintético (gabarito), P&L verificado
-   contra a biblioteca `bt` (corr 0,996), 11 testes automáticos (anti-lookahead,
-   neutralidade, custos convexos);
+   contra a biblioteca `bt` (corr 0,996), 14 testes automáticos (anti-lookahead de 9
+   sinais, neutralidade + setor, custos convexos);
 2. **Dados**: S&P 500 as-of com viés de seleção resolvido e viés de dados quantificado
-   (92% de cobertura);
-3. **Sinal**: `resid_ou` escolhido por evidência — único com IC robusto nos dois splits.
+   (92% membros; removidos 46% vs 99% sobreviventes);
+3. **Sinal**: `resid_ou` escolhido por evidência (11 candidatos testados no total;
+   blend descartado duas vezes por não agregar);
+4. **Backtest oficial dev+val** rodado com mandato completo (seção 7).
 
-### 7.2 Próximos passos
+### 8.2 Próximos passos
 
-1. **Backtest oficial** do `resid_ou` no S&P 500 as-of (otimizador + custos + hedge SPY),
-   períodos dev+val; holdout só na decisão final;
-2. **Análise**: Sharpe líquido, decomposição de custos, capacidade, comportamento em
-   crises (2020, 2022);
-3. **Relatório de 5 páginas + robô** (prazo: pré-relatório 31/07, final 17/08).
+1. **Análise crítica** dos resultados (custos, capacidade, crises 2020/2022);
+2. **Ida única ao holdout** (2024+) — o número final da estratégia;
+3. **Relatório de 5 páginas + robô** (prazos: pré-relatório 31/07, final 17/08).
 
-### 7.3 Glossário
+### 8.3 Glossário
 
 | Termo | Significado |
 |---|---|
