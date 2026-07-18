@@ -25,13 +25,28 @@ from .base import PanelSignal
 class ResidOU(PanelSignal):
     name = "resid_ou"
 
-    def _build_panel(self, md, fm) -> pd.DataFrame:
-        p = self.params()
-        J = int(p.get("accum_days", 60))
-        W = int(p.get("z_window", 252))
+    def _build_panel(self, dados_mercado, modelo_fatores) -> pd.DataFrame:
+        """Constroi a METRICA (passos 1 e 2) como painel data x acao.
 
-        X = fm.residuals.rolling(J, min_periods=int(J * 0.7)).sum()
-        mu = X.rolling(W, min_periods=W // 2).mean()
-        sd = X.rolling(W, min_periods=W // 2).std()
-        raw = -(X - mu) / sd
-        return raw.dropna(how="all")
+        O passo 3 (z-score entre acoes) fica a cargo do PanelSignal.compute().
+        """
+        params = self.params()
+        dias_acumulo = int(params.get("accum_days", 60))    # J: janela do acumulo
+        dias_janela_z = int(params.get("z_window", 252))    # W: janela da media/desvio
+
+        # PASSO 1 -- retorno idiossincratico acumulado: soma dos residuos da janela.
+        # Economicamente, e o afastamento do equilibrio de fatores que deve reverter.
+        retorno_idio_acumulado = modelo_fatores.residuals.rolling(
+            dias_acumulo, min_periods=int(dias_acumulo * 0.7)).sum()
+
+        # PASSO 2 -- normaliza contra o historico da PROPRIA acao (cada uma e sua regua).
+        # Atencao: media/desvio sao calculados sobre a serie de retorno_idio_acumulado,
+        # nao sobre precos.
+        media_propria = retorno_idio_acumulado.rolling(
+            dias_janela_z, min_periods=dias_janela_z // 2).mean()
+        desvio_proprio = retorno_idio_acumulado.rolling(
+            dias_janela_z, min_periods=dias_janela_z // 2).std()
+
+        # sinal negativo INVERTE: acumulo acima do normal dela => "cara" => short
+        metrica = -(retorno_idio_acumulado - media_propria) / desvio_proprio
+        return metrica.dropna(how="all")

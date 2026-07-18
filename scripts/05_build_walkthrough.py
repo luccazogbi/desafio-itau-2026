@@ -68,12 +68,12 @@ explica o *porquê* antes do *como*, no espírito do `alpha_signal_research_tuto
 """)
 
 code("""
-# Setup: raiz do projeto, pacote statarb e estilo de plotagem
+# ---- Setup: localiza a raiz do projeto, importa o pacote e fixa o estilo ----
 import sys, pathlib, json
-ROOT = pathlib.Path.cwd()
-if not (ROOT / "statarb").exists():
-    ROOT = ROOT.parent
-sys.path.insert(0, str(ROOT))
+raiz_projeto = pathlib.Path.cwd()
+if not (raiz_projeto / "statarb").exists():
+    raiz_projeto = raiz_projeto.parent      # se rodando de dentro de notebooks/
+sys.path.insert(0, str(raiz_projeto))
 
 import numpy as np
 import pandas as pd
@@ -83,12 +83,17 @@ from scipy.stats import spearmanr
 from statarb.config import load_config, path_of
 from statarb.viz.style import apply_style, PALETTE
 
-apply_style()          # convencoes do projeto: figsize (12,5), grid, sem spines
-cfg = load_config()
-G = float(cfg["book"]["gross_usd"])
-P = cfg["signal_params"]["resid_ou"]
-print(f"book: ${G/1e9:.0f} bi | sinal oficial: resid_ou "
-      f"(acumulo J={P['accum_days']}d, janela z W={P['z_window']}d)")
+apply_style()                                    # figsize (12,5), grid, sem spines
+config = load_config()                           # todos os parametros do projeto
+
+# Variaveis globais usadas ao longo do notebook:
+book_bruto_usd = float(config["book"]["gross_usd"])       # tamanho do book: $1 bi
+params_sinal   = config["signal_params"]["resid_ou"]      # {accum_days, z_window}
+dias_acumulo   = int(params_sinal["accum_days"])          # J = 60 dias (Passo 1)
+dias_janela_z  = int(params_sinal["z_window"])            # W = 252 dias (Passo 2)
+
+print(f"book: ${book_bruto_usd/1e9:.0f} bi | sinal oficial: resid_ou "
+      f"(acumulo J={dias_acumulo}d, janela z W={dias_janela_z}d)")
 """)
 
 # ============================================================ 1. Dados
@@ -130,35 +135,55 @@ isso que a estratégia migrou para o S&P 500; ver `considerações/`.)*
 
 #### ⚠️ Nota sobre o "gap" no início do gráfico 1.3a
 
-O trecho inicial baixo **não é falta de dados** — é o **warm-up do filtro de histórico**.
-O universo exige **pelo menos 260 dias úteis de histórico** por ação (mínimo para estimar
-betas e vol com confiança); como o painel começa em jan/2018, quase nada é elegível até
-~fev/2019. Toda avaliação começa **depois** do warm-up (`backtest.start = 2020`).
-O mesmo explica degraus ao longo da curva: quem entra no índice só vira "negociável"
-260 dias úteis depois de ter preço.
+O trecho inicial baixo **não é falta de dados** — é **warm-up**. E existem *dois*
+warm-ups distintos, que se acumulam:
+
+| Warm-up | Libera em | Por quê |
+|---|---|---|
+| **Universo negociável** (este gráfico) | jan/2019 | filtro exige ≥ 260 dias úteis de histórico por ação |
+| **Sinal calculável** (o que de fato manda) | **ago/2019** | corrente: betas (252d) → resíduos → $X$ (60d) → $\\mu,\\sigma$ (252d de $X$) |
+
+O elo mais longo é o $\\mu/\\sigma$: ele não espera 252 dias de *preço*, e sim 252 valores
+de **$X$** — e cada $X$ já exigiu 60 dias de resíduos, que exigiram 252 dias para estimar
+os betas. As esperas **se empilham**: ~419 dias úteis (≈1,7 ano) até o primeiro sinal.
+
+Por isso o backtest só começa em **2020** (`backtest.start`), com folga sobre ago/2019.
 """)
 
 code("""
+# ---- Carrega o painel S&P 500 as-of e define o universo negociavel ----
 from statarb.data.loaders import MarketData
 from statarb.data.universe import tradable_mask
 from statarb.factors.betas import FactorModel
 
-md_r = MarketData.from_dir(ROOT / "data" / "processed_sp500", cfg)
-mask_r = tradable_mask(md_r, cfg)
-meta = json.loads((ROOT / "data" / "processed_sp500" / "meta.json").read_text(encoding="utf-8"))
-cov = meta["cobertura_membros_asof"]
+pasta_painel = raiz_projeto / "data" / "processed_sp500"
 
-print(f"painel: {md_r.returns.shape[1]} membros historicos x {md_r.returns.shape[0]} dias "
-      f"({md_r.returns.index[0]:%Y-%m-%d} a {md_r.returns.index[-1]:%Y-%m-%d})")
-print(f"cobertura media dos membros as-of: {cov['media']:.1%} "
-      f"(minima {cov['minima']:.1%} em {cov['mes_minimo']})")
+# dados_mercado: objeto com TODOS os paineis (retornos, precos, volume, membership...)
+dados_mercado = MarketData.from_dir(pasta_painel, config)
 
-fig, axes = plt.subplots(1, 2, figsize=(14, 5))
-mask_r.sum(axis=1).plot(ax=axes[0], color=PALETTE["strategy"])
-axes[0].set_title("1.3a  Universo as-of negociavel por dia")
-pd.Series({pd.Timestamp(k): v for k, v in cov["serie_mensal"].items()}).plot(ax=axes[1], color=PALETTE["cost"])
-axes[1].set_title("1.3b  Cobertura mensal dos membros as-of (vies residual)")
-axes[1].set_ylim(0.6, 1.02)
+# universo_negociavel: matriz booleana (data x acao) = "esta acao pode ser negociada hoje?"
+#   criterios: era membro do indice na data + preco/liquidez minimos + historico suficiente
+universo_negociavel = tradable_mask(dados_mercado, config)
+
+# metadados do pull: fontes, vieses e a cobertura medida dos membros as-of
+metadados = json.loads((pasta_painel / "meta.json").read_text(encoding="utf-8"))
+cobertura = metadados["cobertura_membros_asof"]
+
+n_acoes, n_dias = dados_mercado.returns.shape[1], dados_mercado.returns.shape[0]
+print(f"painel: {n_acoes} membros historicos x {n_dias} dias "
+      f"({dados_mercado.returns.index[0]:%Y-%m-%d} a {dados_mercado.returns.index[-1]:%Y-%m-%d})")
+print(f"cobertura media dos membros as-of: {cobertura['media']:.1%} "
+      f"(minima {cobertura['minima']:.1%} em {cobertura['mes_minimo']})")
+
+# Grafico 1.3a: quantas acoes sao negociaveis a cada dia (mostra o warm-up)
+# Grafico 1.3b: quantos dos membros as-of tem preco disponivel (o vies residual)
+fig, eixos = plt.subplots(1, 2, figsize=(14, 5))
+universo_negociavel.sum(axis=1).plot(ax=eixos[0], color=PALETTE["strategy"])
+eixos[0].set_title("1.3a  Universo as-of negociavel por dia")
+cobertura_mensal = pd.Series({pd.Timestamp(k): v for k, v in cobertura["serie_mensal"].items()})
+cobertura_mensal.plot(ax=eixos[1], color=PALETTE["cost"])
+eixos[1].set_title("1.3b  Cobertura mensal dos membros as-of (vies residual)")
+eixos[1].set_ylim(0.6, 1.02)
 plt.show()
 """)
 
@@ -197,28 +222,38 @@ resíduo do dia *s* usa apenas betas estimados **antes** de *s*.
 """)
 
 code("""
-fm_r = FactorModel(cfg).fit(md_r.returns, md_r.factors)
-B_last = fm_r.betas_asof(md_r.returns.index[-1])
-ivol_last = fm_r.idio_asof(md_r.returns.index[-1])
-print(f"{len(fm_r.est_index)} datas de estimacao de betas")
+# ---- Estima o modelo de fatores: regressao rolling de cada acao nos 6 fatores ----
+# modelo_fatores guarda 3 saidas: betas (sensibilidade a cada fator),
+# residuos (o que os fatores NAO explicam) e vol idiossincratica.
+modelo_fatores = FactorModel(config).fit(dados_mercado.returns, dados_mercado.factors)
 
-fig, axes = plt.subplots(1, 2, figsize=(14, 5))
-B_last["mkt"].hist(bins=40, ax=axes[0], color=PALETTE["strategy"], alpha=0.85)
-axes[0].set_title("2.3a  Betas de mercado do S&P 500 (~1 em media, como esperado)")
-(ivol_last * np.sqrt(252) * 100).hist(bins=40, ax=axes[1], color=PALETTE["cost"], alpha=0.85)
-axes[1].set_title("2.3b  Vol idiossincratica anualizada (%)")
+ultima_data = dados_mercado.returns.index[-1]
+betas_hoje = modelo_fatores.betas_asof(ultima_data)      # DataFrame: acao x 6 fatores
+vol_idio_hoje = modelo_fatores.idio_asof(ultima_data)    # Series: vol diaria por acao
+print(f"{len(modelo_fatores.est_index)} datas de estimacao de betas")
+
+fig, eixos = plt.subplots(1, 2, figsize=(14, 5))
+betas_hoje["mkt"].hist(bins=40, ax=eixos[0], color=PALETTE["strategy"], alpha=0.85)
+eixos[0].set_title("2.3a  Betas de mercado do S&P 500 (~1 em media, como esperado)")
+vol_idio_anualizada = vol_idio_hoje * np.sqrt(252) * 100
+vol_idio_anualizada.hist(bins=40, ax=eixos[1], color=PALETTE["cost"], alpha=0.85)
+eixos[1].set_title("2.3b  Vol idiossincratica anualizada (%)")
 plt.show()
 """)
 
 code("""
-# O residuo em acao: um ticker real, retorno total vs so a "historia propria"
-tk = "AAPL" if "AAPL" in md_r.returns.columns else md_r.returns.columns[0]
-eps_r = fm_r.residuals[tk].dropna()
-fig, ax = plt.subplots()
-(1 + md_r.returns[tk].loc[eps_r.index]).cumprod().plot(ax=ax, label="retorno total", color=PALETTE["strategy"])
-(1 + eps_r).cumprod().plot(ax=ax, label="so o residuo (sem fatores)", color=PALETTE["cost"])
-ax.set_title(f"2.3c  {tk}: removendo os fatores sobra o movimento proprio da acao")
-ax.legend(); plt.show()
+# ---- O residuo em acao: uma acao real, retorno total vs "historia propria" ----
+# Compara o crescimento de $1 investido no retorno TOTAL (com fatores) contra
+# o crescimento so do RESIDUO (removendo mercado, tamanho, valor, momentum...).
+acao_exemplo = "AAPL" if "AAPL" in dados_mercado.returns.columns else dados_mercado.returns.columns[0]
+residuos_diarios = modelo_fatores.residuals[acao_exemplo].dropna()   # a serie de epsilon
+retornos_totais = dados_mercado.returns[acao_exemplo].loc[residuos_diarios.index]
+
+fig, eixo = plt.subplots()
+(1 + retornos_totais).cumprod().plot(ax=eixo, label="retorno total", color=PALETTE["strategy"])
+(1 + residuos_diarios).cumprod().plot(ax=eixo, label="so o residuo (sem fatores)", color=PALETTE["cost"])
+eixo.set_title(f"2.3c  {acao_exemplo}: removendo os fatores sobra o movimento proprio da acao")
+eixo.legend(); plt.show()
 """)
 
 # ============================================================ 3. O sinal
@@ -240,10 +275,14 @@ camadas, e vamos construí-las nesta ordem:
 
 Tudo começa por uma crença (Avellaneda & Lee, 2010, *arbitragem estatística*):
 
-> Quando uma ação acumula um **retorno idiossincrático** anormalmente grande — um
-> movimento *próprio*, não explicado pelos fatores —, isso costuma ser **sobre-reação a
-> fluxo** (liquidez, rebalanceamento de fundos), não informação nova. E sobre-reação
-> **se desfaz**: esse movimento próprio tende a **reverter à média** no horizonte de ~1 mês.
+> Quando o **retorno idiossincrático acumulado** de uma ação se afasta anormalmente do
+> **seu próprio nível médio recente**, esse afastamento costuma ser **sobre-reação a
+> fluxo** (liquidez, rebalanceamento de fundos), e não informação nova. E sobre-reação
+> **se desfaz**: o acúmulo tende a **reverter ao nível normal daquela ação** no horizonte
+> de ~1 mês.
+
+Note o ponto de referência: a reversão é ao **nível médio da própria ação**, não a zero —
+é exatamente isso que a métrica (seção 3.2) mede.
 
 A lógica do lucro é econômica: um vendedor apressado empurra o preço para longe do
 equilíbrio; quem compra dele **provê liquidez** e é remunerado quando o preço volta.
@@ -254,8 +293,11 @@ em large caps (arbitrada por HFT), mas a do horizonte **mensal sobrevive** — �
 
 ### 3.2 A métrica
 
-Para transformar a tese em número, precisamos medir *"quão esticado, e para qual lado,
-está o movimento próprio desta ação"*. Isso se faz em dois passos.
+A tese fala em **afastamento do próprio nível normal**. Traduzi-la em número exige, então,
+responder duas perguntas — e cada uma é um passo:
+
+1. *Quanto* esta ação acumulou de retorno próprio? → **Passo 1**
+2. *Quão longe* isso está do que é normal **para ela**? → **Passo 2**
 
 **Passo 1 — Acumular o retorno idiossincrático:**
 
@@ -280,13 +322,43 @@ muito **abaixo** → "barata" → **long**.
 Esse $s_i$ é a **métrica**: um número por ação que já mede o esticamento relativo — mas
 ainda na escala individual de cada uma.
 
+#### As camadas, do dado bruto ao score (exemplo real: AAPL)
+
+Vale fixar que cada camada é construída sobre a anterior — e que **$X$ é uma série
+diária**: todo dia calculamos um novo acúmulo de 60 dias. É sobre essa série de $X$ que
+tiramos média e desvio-padrão (nunca sobre o preço).
+
+| Camada | O que representa | Valor |
+|---|---|---:|
+| $\\varepsilon$ (resíduo diário) | quanto a ação andou sozinha **naquele dia** | −0,42% |
+| $X$ (acúmulo de 60d) | quanto ela andou sozinha em **~3 meses** | **+15,75%** |
+| $\\mu$ (média de $X$, 252d) | o nível **típico** desse acúmulo para a AAPL | **+4,55%** |
+| $\\sigma$ (desvio-padrão de $X$, 252d) | o quanto esse acúmulo **costuma oscilar** | **10,99%** |
+| $s$ (métrica) | $-(15{,}75 - 4{,}55)/10{,}99$ | **−1,02** |
+
+**Leitura:** *a AAPL normalmente acumula ~+4,5% de retorno próprio em 3 meses; hoje
+acumulou +15,75% — 1 desvio-padrão acima do normal dela → esticada para cima →
+candidata a **short**.* Note que o preço (US$ 312, média anual US$ 251) **não entra em
+lugar nenhum**: trabalhamos apenas com retornos.
+
 ### 3.3 O sinal
 
 Falta um passo para a métrica virar sinal: torná-la **comparável entre as ações**.
 
-**Passo 3 — Padronizar no corte transversal (todo dia):** os $s_i$ de todas as ações do
-dia são transformados num **z-score cross-sectional** (média 0, desvio-padrão 1) e
-**winsorizados** em ±3 (nenhum outlier domina o book).
+**Passo 3 — Padronizar no corte transversal (todo dia):** calcula-se a **média
+$\\bar{s}$ e o desvio-padrão $\\sigma_s$ dos $s_i$ de todas as ações daquele dia**, e cada
+ação é padronizada por eles:
+
+$$ z_i = \\frac{s_i - \\bar{s}}{\\sigma_s} $$
+
+O resultado fica centrado em zero e com escala unitária, e é então **winsorizado** em ±3
+(nenhum outlier domina o book).
+
+*Por que centrar importa:* a métrica bruta não vem centrada — em um dia real, a média
+cross-sectional dos $s_i$ era +0,27 e o desvio, 1,45. Esse deslocamento comum a todas as
+ações **não é operável** por um book dollar-neutral (que só monetiza diferenças
+relativas); subtrair $\\bar{s}$ descarta o nível comum e preserva o **ranking**, que é o
+que de fato rende.
 
 **O resultado é o sinal `resid_ou`:** um número por ação, por dia, entre −3 e +3.
 Positivo = retorno idiossincrático esticado para *baixo* → espera-se a volta para cima →
@@ -307,40 +379,53 @@ sem o futuro no painel.
 """)
 
 code("""
-# Passos 1 e 2 visiveis em UMA acao: X acumulado vs bandas do proprio historico
+# ---- A METRICA (passos 1 e 2) visivel em UMA acao ----
+# Passo 1: retorno_idio_acumulado = soma dos ultimos 60 residuos (o "X" da formula)
+# Passo 2: compara esse acumulo com a media/desvio moveis DELE MESMO (janela 252d)
+# As bandas tracejadas sao as linhas de score = +-1 desenhadas em escala de retorno.
 from statarb.signals import build_signal
 
-J, W = int(P["accum_days"]), int(P["z_window"])
-X = fm_r.residuals[tk].rolling(J, min_periods=int(J * 0.7)).sum()
-mu = X.rolling(W, min_periods=W // 2).mean()
-sd = X.rolling(W, min_periods=W // 2).std()
+retorno_idio_acumulado = (modelo_fatores.residuals[acao_exemplo]
+                          .rolling(dias_acumulo, min_periods=int(dias_acumulo * 0.7)).sum())
+media_movel_propria  = retorno_idio_acumulado.rolling(dias_janela_z, min_periods=dias_janela_z // 2).mean()
+desvio_movel_proprio = retorno_idio_acumulado.rolling(dias_janela_z, min_periods=dias_janela_z // 2).std()
 
-fig, ax = plt.subplots()
-X.plot(ax=ax, color=PALETTE["strategy"], label=f"X = retorno idiossincratico acumulado ({J}d)")
-mu.plot(ax=ax, color="k", lw=1, label="media movel propria (mu)")
-(mu + sd).plot(ax=ax, color=PALETTE["drawdown"], ls="--", lw=0.8, label="mu +- 1 desvio-padrao")
-(mu - sd).plot(ax=ax, color=PALETTE["drawdown"], ls="--", lw=0.8, label="_")
-ax.fill_between(X.index, mu - sd, mu + sd, alpha=0.08, color=PALETTE["drawdown"])
-ax.set_title(f"3.2 (metrica)  {tk}: acima da banda = esticado p/ cima => short; abaixo => long")
-ax.legend(); plt.show()
+banda_superior = media_movel_propria + desvio_movel_proprio   # score = -1 (esticado p/ cima)
+banda_inferior = media_movel_propria - desvio_movel_proprio   # score = +1 (esticado p/ baixo)
+
+fig, eixo = plt.subplots()
+retorno_idio_acumulado.plot(ax=eixo, color=PALETTE["strategy"],
+    label=f"retorno idiossincratico acumulado ({dias_acumulo}d)")
+media_movel_propria.plot(ax=eixo, color="k", lw=1, label="media movel propria (mu)")
+banda_superior.plot(ax=eixo, color=PALETTE["drawdown"], ls="--", lw=0.8, label="mu +- 1 desvio-padrao")
+banda_inferior.plot(ax=eixo, color=PALETTE["drawdown"], ls="--", lw=0.8, label="_")
+eixo.fill_between(retorno_idio_acumulado.index, banda_inferior, banda_superior,
+                  alpha=0.08, color=PALETTE["drawdown"])
+eixo.set_title(f"3.2 (metrica)  {acao_exemplo}: acima da banda = esticado p/ cima => short; abaixo => long")
+eixo.legend(); plt.show()
 """)
 
 code("""
-# Passo 3: o corte transversal em um dia -- z-scores prontos para o otimizador
-sig = build_signal(cfg, "resid_ou")
-d = md_r.returns.index[-10]
-univ = list(mask_r.columns[mask_r.loc[d]])
-z = sig.compute(md_r, fm_r, d, univ)
+# ---- O SINAL (passo 3): a metrica padronizada ENTRE as acoes de um mesmo dia ----
+# sinal_resid_ou.compute() faz os 3 passos e devolve o z-score final por acao.
+sinal_resid_ou = build_signal(config, "resid_ou")
 
-fig, ax = plt.subplots()
-z.hist(bins=40, ax=ax, color=PALETTE["strategy"], alpha=0.85)
-ax.axvline(0, color="k", lw=0.8)
-ax.set_title(f"3.3 (sinal)  z-scores finais em {d:%Y-%m-%d} ({len(z)} acoes, cap +-3)")
-ax.set_xlabel("z (positivo = esticada p/ baixo vs proprio historico = long)")
+data_exemplo = dados_mercado.returns.index[-10]
+acoes_do_dia = list(universo_negociavel.columns[universo_negociavel.loc[data_exemplo]])
+
+# zscores: Series (acao -> score entre -3 e +3). Positivo = candidata a compra.
+zscores = sinal_resid_ou.compute(dados_mercado, modelo_fatores, data_exemplo, acoes_do_dia)
+
+fig, eixo = plt.subplots()
+zscores.hist(bins=40, ax=eixo, color=PALETTE["strategy"], alpha=0.85)
+eixo.axvline(0, color="k", lw=0.8)
+eixo.set_title(f"3.3 (sinal)  z-scores finais em {data_exemplo:%Y-%m-%d} "
+               f"({len(zscores)} acoes, cap +-3)")
+eixo.set_xlabel("z (positivo = esticada p/ baixo vs proprio historico = long)")
 plt.show()
 
-print("5 mais 'baratas' (long): ", ", ".join(z.nlargest(5).index))
-print("5 mais 'caras'  (short):", ", ".join(z.nsmallest(5).index))
+print("5 mais 'baratas' (long): ", ", ".join(zscores.nlargest(5).index))
+print("5 mais 'caras'  (short):", ", ".join(zscores.nsmallest(5).index))
 """)
 
 # ============================================================ 4. Validação
@@ -370,41 +455,57 @@ no meio.
 """)
 
 code("""
-H = 21                                     # horizonte natural do sinal (~1 mes)
-idx_r = md_r.returns.index
-start_eval = idx_r.searchsorted(pd.Timestamp(cfg["backtest"]["start"]))
-dev_end = pd.Timestamp(cfg["funnel"]["dev_end"]); val_end = pd.Timestamp(cfg["funnel"]["val_end"])
+# ---- Mede o poder preditivo do sinal: IC e escada de quintis ----
+# Para cada data da grade: calcula o sinal, olha o retorno RESIDUAL dos 21 dias
+# seguintes (a partir de t+2, respeitando o lag de execucao) e mede a correlacao.
+horizonte_dias = 21                                  # horizonte natural do sinal (~1 mes)
+datas_painel = dados_mercado.returns.index
+pos_inicio = datas_painel.searchsorted(pd.Timestamp(config["backtest"]["start"]))
+fim_dev = pd.Timestamp(config["funnel"]["dev_end"])   # fim do periodo de desenvolvimento
+fim_val = pd.Timestamp(config["funnel"]["val_end"])   # fim da validacao (holdout depois)
 
-ics, qrets = [], []
-for p in range(start_eval, len(idx_r) - H - 2, 5):
-    d = idx_r[p]
-    if d > val_end:                        # holdout trancado (protocolo)
+ic_por_data = []          # lista de (data, IC daquele dia)
+retorno_por_quintil = []  # retorno futuro medio de cada quintil, por data
+
+for pos in range(pos_inicio, len(datas_painel) - horizonte_dias - 2, 5):
+    data = datas_painel[pos]
+    if data > fim_val:                               # holdout trancado (protocolo)
         break
-    univ_d = list(mask_r.columns[mask_r.loc[d]])
-    z_d = sig.compute(md_r, fm_r, d, univ_d)
-    if len(z_d) < 200:
+
+    acoes_hoje = list(universo_negociavel.columns[universo_negociavel.loc[data]])
+    zscores_hoje = sinal_resid_ou.compute(dados_mercado, modelo_fatores, data, acoes_hoje)
+    if len(zscores_hoje) < 200:
         continue
-    fwd = fm_r.residuals.iloc[p + 2 : p + 2 + H].sum(min_count=int(H * 0.7))
-    common = z_d.index.intersection(fwd.dropna().index)
-    ics.append((d, spearmanr(z_d[common], fwd[common])[0]))
-    q = pd.qcut(z_d[common].rank(method="first"), 5, labels=False)
-    qrets.append(fwd[common].groupby(q).mean())
 
-ic = pd.Series(dict(ics))
-quint = pd.concat(qrets, axis=1).mean(axis=1) * 1e4 / H
+    # retorno residual acumulado de t+2 ate t+2+21 (o que o sinal tenta prever)
+    retorno_futuro = modelo_fatores.residuals.iloc[pos + 2 : pos + 2 + horizonte_dias] \\
+                                   .sum(min_count=int(horizonte_dias * 0.7))
+    acoes_validas = zscores_hoje.index.intersection(retorno_futuro.dropna().index)
 
-ic_dev, ic_val = ic[ic.index <= dev_end], ic[ic.index > dev_end]
-t = lambda s: s.mean() / s.std() * np.sqrt(len(s))
+    ic_por_data.append((data, spearmanr(zscores_hoje[acoes_validas],
+                                        retorno_futuro[acoes_validas])[0]))
+    quintil = pd.qcut(zscores_hoje[acoes_validas].rank(method="first"), 5, labels=False)
+    retorno_por_quintil.append(retorno_futuro[acoes_validas].groupby(quintil).mean())
 
-fig, axes = plt.subplots(1, 2, figsize=(14, 5))
-ic.plot(ax=axes[0], color=PALETTE["strategy"], alpha=0.45)
-ic.rolling(13).mean().plot(ax=axes[0], color=PALETTE["drawdown"], lw=2)
-axes[0].axvline(dev_end, color="k", ls=":", lw=1); axes[0].axhline(0, color="k", lw=0.8)
-axes[0].set_title(f"4.2  IC (fwd {H}d): dev {ic_dev.mean():+.3f} (t={t(ic_dev):+.1f}) | "
-                  f"val {ic_val.mean():+.3f} (t={t(ic_val):+.1f})")
-quint.plot(kind="bar", ax=axes[1], color=PALETTE["iwm"], alpha=0.85)
-axes[1].set_title("4.3  Escada de quintis: residuo futuro (bps/dia)")
-axes[1].set_xlabel("quintil (0=short ... 4=long)")
+serie_ic = pd.Series(dict(ic_por_data))
+# converte o retorno de cada quintil para bps por dia (mais legivel)
+quintis_bps_dia = pd.concat(retorno_por_quintil, axis=1).mean(axis=1) * 1e4 / horizonte_dias
+
+ic_dev = serie_ic[serie_ic.index <= fim_dev]         # periodo de desenvolvimento
+ic_val = serie_ic[serie_ic.index > fim_dev]          # periodo de validacao
+t_stat = lambda s: s.mean() / s.std() * np.sqrt(len(s))
+
+fig, eixos = plt.subplots(1, 2, figsize=(14, 5))
+serie_ic.plot(ax=eixos[0], color=PALETTE["strategy"], alpha=0.45)
+serie_ic.rolling(13).mean().plot(ax=eixos[0], color=PALETTE["drawdown"], lw=2)
+eixos[0].axvline(fim_dev, color="k", ls=":", lw=1)   # linha divisoria dev | val
+eixos[0].axhline(0, color="k", lw=0.8)
+eixos[0].set_title(f"4.2  IC (fwd {horizonte_dias}d): "
+                   f"dev {ic_dev.mean():+.3f} (t={t_stat(ic_dev):+.1f}) | "
+                   f"val {ic_val.mean():+.3f} (t={t_stat(ic_val):+.1f})")
+quintis_bps_dia.plot(kind="bar", ax=eixos[1], color=PALETTE["iwm"], alpha=0.85)
+eixos[1].set_title("4.3  Escada de quintis: residuo futuro (bps/dia)")
+eixos[1].set_xlabel("quintil (0=short ... 4=long)")
 plt.show()
 """)
 
@@ -456,40 +557,54 @@ beta-neutral).
 """)
 
 code("""
+# ---- Do sinal ao portfolio: monta os insumos e resolve o otimizador ----
 from statarb.costs.almgren_chriss import ACCostModel
 from statarb.portfolio.optimizer import optimize_weights, to_series
 from statarb.risk.covariance import factor_cov_chol, total_vol
 
-B_df, ivol_s = fm_r.betas_asof(d), fm_r.idio_asof(d)
-names = sorted(set(z.index) & set(B_df.index) & set(ivol_s.index))
-adv_row = md_r.adv.loc[d].reindex(names)
-names = [n for n, ok in zip(names, adv_row.notna().values) if ok]
+# 1) Acoes elegiveis: precisam ter sinal, betas, vol idio e liquidez conhecidos
+betas_data = modelo_fatores.betas_asof(data_exemplo)
+vol_idio_data = modelo_fatores.idio_asof(data_exemplo)
+acoes = sorted(set(zscores.index) & set(betas_data.index) & set(vol_idio_data.index))
+liquidez_diaria = dados_mercado.adv.loc[data_exemplo].reindex(acoes)   # ADV em USD
+acoes = [nome for nome, tem_adv in zip(acoes, liquidez_diaria.notna().values) if tem_adv]
 
-alpha = z.reindex(names).values * 5e-4 * 21     # 5 bps/z ao dia, amortizado em ~21d
-B = B_df.reindex(names).values
-ivol = ivol_s.reindex(names).values
-F_chol = factor_cov_chol(md_r.factors, d, 252)
-sigma = total_vol(B, F_chol, ivol)
-adv = md_r.adv.loc[d].reindex(names).values
+# 2) Insumos do otimizador (todos alinhados na mesma ordem de `acoes`)
+retorno_esperado = zscores.reindex(acoes).values * 5e-4 * 21   # 5 bps/z x horizonte 21d
+matriz_betas = betas_data.reindex(acoes).values                # (n_acoes x 6 fatores)
+vol_idio = vol_idio_data.reindex(acoes).values                 # vol idiossincratica diaria
+chol_cov_fatores = factor_cov_chol(dados_mercado.factors, data_exemplo, 252)
+vol_total = total_vol(matriz_betas, chol_cov_fatores, vol_idio)  # usada no custo
+adv_usd = dados_mercado.adv.loc[data_exemplo].reindex(acoes).values
+setores = dados_mercado.sectors.reindex(acoes).fillna("Unknown").values
 
-sectors_d = md_r.sectors.reindex(names).fillna("Unknown").values
-w = optimize_weights(alpha=alpha, B=B, F_chol=F_chol, ivol=ivol, sigma_total=sigma,
-                     adv=adv, w_prev=np.zeros(len(names)),
-                     cost_model=ACCostModel(cfg), cfg=cfg, sectors=sectors_d)
-ws = to_series(w, names)
-sec_net = pd.Series(w, index=names).groupby(pd.Series(sectors_d, index=names)).sum()
-print(f"posicoes: {(ws != 0).sum()} | gross: {ws.abs().sum():.3f} do book | net: {ws.sum():+.5f}")
-print(f"maior |net setorial|: {sec_net.abs().max():.3f} (limite 0.05) -- neutralidade setorial OK")
+# 3) Resolve: maximiza alfa - risco - custo, sujeito a todo o mandato
+pesos_array = optimize_weights(
+    alpha=retorno_esperado, B=matriz_betas, F_chol=chol_cov_fatores, ivol=vol_idio,
+    sigma_total=vol_total, adv=adv_usd, w_prev=np.zeros(len(acoes)),
+    cost_model=ACCostModel(config), cfg=config, sectors=setores)
 
-expo = pd.Series(B.T @ w, index=list(md_r.factors.columns))
-fig, axes = plt.subplots(1, 2, figsize=(14, 5))
-expo.plot(kind="bar", ax=axes[0], color=PALETTE["strategy"], alpha=0.85)
-axes[0].axhline(0.02, color=PALETTE["drawdown"], ls="--"); axes[0].axhline(-0.02, color=PALETTE["drawdown"], ls="--")
-axes[0].set_title("5a  Exposicao do book por fator: dentro de +-0.02")
-axes[1].scatter(z.reindex(ws.index), ws * 100, s=10, alpha=0.5, color=PALETTE["strategy"])
-axes[1].axhline(0, color="k", lw=0.8)
-axes[1].set_title("5b  Peso final (%) vs z-score: sinal manda, caps limitam")
-axes[1].set_xlabel("z-score")
+pesos = to_series(pesos_array, acoes)          # Series: acao -> peso (fracao do book)
+net_por_setor = pd.Series(pesos_array, index=acoes).groupby(pd.Series(setores, index=acoes)).sum()
+
+print(f"posicoes: {(pesos != 0).sum()} | gross: {pesos.abs().sum():.3f} do book "
+      f"| net: {pesos.sum():+.5f}")
+print(f"maior |net setorial|: {net_por_setor.abs().max():.3f} (limite 0.05) "
+      f"-- neutralidade setorial OK")
+
+# 4) Diagnostico: o book ficou neutro? o peso segue o sinal?
+exposicao_por_fator = pd.Series(matriz_betas.T @ pesos_array,
+                                index=list(dados_mercado.factors.columns))
+fig, eixos = plt.subplots(1, 2, figsize=(14, 5))
+exposicao_por_fator.plot(kind="bar", ax=eixos[0], color=PALETTE["strategy"], alpha=0.85)
+eixos[0].axhline(0.02, color=PALETTE["drawdown"], ls="--")
+eixos[0].axhline(-0.02, color=PALETTE["drawdown"], ls="--")
+eixos[0].set_title("5a  Exposicao do book por fator: dentro de +-0.02")
+eixos[1].scatter(zscores.reindex(pesos.index), pesos * 100, s=10, alpha=0.5,
+                 color=PALETTE["strategy"])
+eixos[1].axhline(0, color="k", lw=0.8)
+eixos[1].set_title("5b  Peso final (%) vs z-score: sinal manda, caps limitam")
+eixos[1].set_xlabel("z-score")
 plt.show()
 """)
 
@@ -512,17 +627,23 @@ t+1 -> t+2: nova posicao comeca a render
 """)
 
 code("""
-part = np.linspace(0.001, 0.30, 200)
-sigma_d = 0.015
-eta, gamma, spread = (float(cfg["costs"]["ac_eta"]), float(cfg["costs"]["ac_gamma"]),
-                      float(cfg["costs"]["spread_bps"]))
-bps = spread + 1e4 * (eta * sigma_d * np.sqrt(part) + 0.5 * gamma * sigma_d * part)
+# ---- Curva de custo: quanto custa negociar, por participacao no volume ----
+# Formula Almgren-Chriss: spread + impacto temporario (raiz) + impacto permanente (linear)
+participacao_adv = np.linspace(0.001, 0.30, 200)     # 0,1% a 30% do volume diario
+vol_diaria_tipica = 0.015                            # 1,5% ao dia (large cap tipica)
+coef_impacto_temp = float(config["costs"]["ac_eta"])      # eta
+coef_impacto_perm = float(config["costs"]["ac_gamma"])    # gamma
+spread_bps = float(config["costs"]["spread_bps"])         # meio-spread + taxas
 
-fig, ax = plt.subplots()
-ax.plot(part * 100, bps, color=PALETTE["cost"], lw=2)
-ax.axvline(5, color=PALETTE["drawdown"], ls="--", label="cap de participacao (5% do ADV)")
-ax.set_title("6  Custo por dolar negociado vs participacao no volume (Almgren-Chriss)")
-ax.set_xlabel("participacao no volume diario (%)"); ax.set_ylabel("bps"); ax.legend()
+custo_bps = (spread_bps
+             + 1e4 * (coef_impacto_temp * vol_diaria_tipica * np.sqrt(participacao_adv)
+                      + 0.5 * coef_impacto_perm * vol_diaria_tipica * participacao_adv))
+
+fig, eixo = plt.subplots()
+eixo.plot(participacao_adv * 100, custo_bps, color=PALETTE["cost"], lw=2)
+eixo.axvline(5, color=PALETTE["drawdown"], ls="--", label="cap de participacao (5% do ADV)")
+eixo.set_title("6  Custo por dolar negociado vs participacao no volume (Almgren-Chriss)")
+eixo.set_xlabel("participacao no volume diario (%)"); eixo.set_ylabel("bps"); eixo.legend()
 plt.show()
 """)
 
@@ -543,56 +664,75 @@ usado uma única vez, na decisão final (protocolo anti-overfitting).
 """)
 
 code("""
-import json as _json
-REP = ROOT / "reports" / "sp500_dev_val"
-res_bt = pd.read_parquet(REP / "results_daily.parquet")
-m_bt = _json.loads((REP / "metrics.json").read_text(encoding="utf-8"))
+# ---- Carrega os resultados do backtest oficial (rodado por scripts/02) ----
+# resultado_diario: uma linha por dia (P&L, custos, gross/net, exposicoes, turnover)
+# metricas: o resumo consolidado (Sharpe, drawdown, turnover anual...)
+pasta_backtest = raiz_projeto / "reports" / "sp500_dev_val"
+resultado_diario = pd.read_parquet(pasta_backtest / "results_daily.parquet")
+metricas = json.loads((pasta_backtest / "metrics.json").read_text(encoding="utf-8"))
 
-resumo = pd.Series({
-    "Sharpe bruto": m_bt["sharpe_gross"], "Sharpe liquido": m_bt["sharpe_net"],
-    "Retorno liquido (% a.a. do gross)": m_bt["ann_return_net_pct"],
-    "Vol (% a.a.)": m_bt["ann_vol_pct"], "Max drawdown (%)": m_bt["max_drawdown_pct"],
-    "Turnover (x gross/ano)": m_bt["ann_turnover_x"],
-    "Custos (bps do gross/ano)": m_bt["costs_bps_of_gross_per_year"],
-    "Gross medio": m_bt["avg_gross"], "|Net| maximo": m_bt["max_abs_net"],
-    "Max |expo fator|": m_bt["max_abs_factor_expo"],
-    "Max |net setorial|": float(res_bt["max_sector_net"].max()) if "max_sector_net" in res_bt else float("nan"),
-    "Posicoes (media)": m_bt["avg_n_positions"],
-    "P&L liquido acumulado (USD mm)": m_bt["pnl_net_total_usd_mm"],
+max_net_setorial = (float(resultado_diario["max_sector_net"].max())
+                    if "max_sector_net" in resultado_diario else float("nan"))
+
+resumo_backtest = pd.Series({
+    "Sharpe bruto": metricas["sharpe_gross"],
+    "Sharpe liquido": metricas["sharpe_net"],
+    "Retorno liquido (% a.a. do gross)": metricas["ann_return_net_pct"],
+    "Vol (% a.a.)": metricas["ann_vol_pct"],
+    "Max drawdown (%)": metricas["max_drawdown_pct"],
+    "Turnover (x gross/ano)": metricas["ann_turnover_x"],
+    "Custos (bps do gross/ano)": metricas["costs_bps_of_gross_per_year"],
+    "Gross medio": metricas["avg_gross"],
+    "|Net| maximo": metricas["max_abs_net"],
+    "Max |expo fator|": metricas["max_abs_factor_expo"],
+    "Max |net setorial|": max_net_setorial,
+    "Posicoes (media)": metricas["avg_n_positions"],
+    "P&L liquido acumulado (USD mm)": metricas["pnl_net_total_usd_mm"],
 }).round(3)
-resumo.to_frame("valor")
+resumo_backtest.to_frame("valor")
 """)
 
 code("""
-G_ = 1e9
-eq_bt = pd.DataFrame({
-    "resid_ou (net)": (1 + res_bt["pnl_net_usd"] / G_).cumprod(),
-    "Cash (RF)": (1 + md_r.rf.reindex(res_bt.index).fillna(0)).cumprod(),
-    "SPY": (1 + md_r.iwm_ret.reindex(res_bt.index).fillna(0)).cumprod(),
+# ---- Raio-x do backtest: capital, drawdown, neutralidade e P&L por perna ----
+# Retornos diarios como fracao do book, para comparar com benchmarks na mesma escala.
+retorno_diario_liquido = resultado_diario["pnl_net_usd"] / book_bruto_usd
+
+curvas_capital = pd.DataFrame({
+    "resid_ou (net)": (1 + retorno_diario_liquido).cumprod(),
+    "Cash (RF)": (1 + dados_mercado.rf.reindex(resultado_diario.index).fillna(0)).cumprod(),
+    "SPY": (1 + dados_mercado.iwm_ret.reindex(resultado_diario.index).fillna(0)).cumprod(),
 })
-fig, axes = plt.subplots(2, 2, figsize=(14, 8))
-eq_bt.plot(ax=axes[0, 0], color=[PALETTE["strategy"], PALETTE["benchmark"], PALETTE["iwm"]])
-axes[0, 0].set_title("7a  Curva de capital (base 1.0) -- book neutro se compara com CASH")
 
-cum = res_bt["pnl_net_usd"].cumsum() / G_ * 100
-(cum - cum.cummax()).plot(ax=axes[0, 1], color=PALETTE["drawdown"])
-axes[0, 1].set_title("7b  Drawdown (% do gross)")
+fig, eixos = plt.subplots(2, 2, figsize=(14, 8))
 
-expo_cols = [c for c in res_bt.columns if c.startswith("expo_")]
-res_bt[expo_cols].rename(columns=lambda c: c[5:]).plot(ax=axes[1, 0], lw=0.8)
-axes[1, 0].set_title("7c  Exposicao a fatores (prova da neutralidade)")
+curvas_capital.plot(ax=eixos[0, 0],
+                    color=[PALETTE["strategy"], PALETTE["benchmark"], PALETTE["iwm"]])
+eixos[0, 0].set_title("7a  Curva de capital (base 1.0) -- book neutro se compara com CASH")
 
-(res_bt[["pnl_long_usd", "pnl_short_usd", "pnl_hedge_usd"]].cumsum() / 1e6).rename(
-    columns={"pnl_long_usd": "long", "pnl_short_usd": "short", "pnl_hedge_usd": "hedge SPY"}
-).plot(ax=axes[1, 1], color=[PALETTE["long"], PALETTE["short"], PALETTE["benchmark"]])
-axes[1, 1].set_title("7d  P&L acumulado por perna (USD mm)")
+# drawdown = quanto o P&L acumulado esta abaixo do seu proprio pico historico
+pnl_acumulado_pct = resultado_diario["pnl_net_usd"].cumsum() / book_bruto_usd * 100
+drawdown_pct = pnl_acumulado_pct - pnl_acumulado_pct.cummax()
+drawdown_pct.plot(ax=eixos[0, 1], color=PALETTE["drawdown"])
+eixos[0, 1].set_title("7b  Drawdown (% do gross)")
+
+colunas_exposicao = [c for c in resultado_diario.columns if c.startswith("expo_")]
+resultado_diario[colunas_exposicao].rename(columns=lambda c: c[5:]).plot(ax=eixos[1, 0], lw=0.8)
+eixos[1, 0].set_title("7c  Exposicao a fatores (prova da neutralidade)")
+
+pnl_por_perna = (resultado_diario[["pnl_long_usd", "pnl_short_usd", "pnl_hedge_usd"]]
+                 .cumsum() / 1e6)
+pnl_por_perna.rename(columns={"pnl_long_usd": "long", "pnl_short_usd": "short",
+                              "pnl_hedge_usd": "hedge SPY"}).plot(
+    ax=eixos[1, 1], color=[PALETTE["long"], PALETTE["short"], PALETTE["benchmark"]])
+eixos[1, 1].set_title("7d  P&L acumulado por perna (USD mm)")
 plt.tight_layout(); plt.show()
 
-daily_net = res_bt["pnl_net_usd"] / G_
-by_year = daily_net.groupby(res_bt.index.year).apply(lambda x: (x.mean()*252*100, x.mean()/x.std()*np.sqrt(252)))
+# Desempenho ano a ano: mostra se o alfa foi consistente ou concentrado
 print("Por ano (ret liq % a.a. | Sharpe):")
-for y, (r_, s_) in by_year.items():
-    print(f"  {y}: {r_:+6.2f}%  |  {s_:+.2f}")
+for ano, retornos_ano in retorno_diario_liquido.groupby(resultado_diario.index.year):
+    retorno_anualizado = retornos_ano.mean() * 252 * 100
+    sharpe_ano = retornos_ano.mean() / retornos_ano.std() * np.sqrt(252)
+    print(f"  {ano}: {retorno_anualizado:+6.2f}%  |  {sharpe_ano:+.2f}")
 """)
 
 # ============================================================ 8. Fecho

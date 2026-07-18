@@ -30,13 +30,22 @@ class Signal(ABC):
         """Scores cross-sectional na data, usando apenas dados <= date."""
         raise NotImplementedError
 
-    def _zscore(self, raw: pd.Series) -> pd.Series:
-        """Normalizacao padrao: z-score cross-sectional winsorizado em +-cap."""
-        raw = raw.replace([np.inf, -np.inf], np.nan).dropna()
-        if len(raw) < 5:
+    def _zscore(self, metrica: pd.Series) -> pd.Series:
+        """PASSO 3: transforma a METRICA (uma por acao) no SINAL final.
+
+        Padroniza no CORTE TRANSVERSAL -- a media e o desvio sao calculados
+        entre as acoes daquele dia, nao ao longo do tempo:
+            z_i = (metrica_i - media_do_dia) / desvio_do_dia
+        Centrar importa: um book dollar-neutral so monetiza diferencas
+        RELATIVAS; o nivel comum a todas as acoes nao e operavel.
+        """
+        metrica = metrica.replace([np.inf, -np.inf], np.nan).dropna()
+        if len(metrica) < 5:
             return pd.Series(dtype=float)
-        z = (raw - raw.mean()) / (raw.std(ddof=0) + 1e-12)
-        return z.clip(-self.cap, self.cap)
+        media_do_dia = metrica.mean()
+        desvio_do_dia = metrica.std(ddof=0)
+        zscore = (metrica - media_do_dia) / (desvio_do_dia + 1e-12)
+        return zscore.clip(-self.cap, self.cap)   # winsoriza: outlier nao domina o book
 
     def params(self) -> dict:
         """Parametros do sinal declarados em cfg['signal_params'][name]."""
@@ -56,21 +65,26 @@ class PanelSignal(Signal):
 
     max_staleness_days: int = 45   # sinais mensais valem ate ~1 mes + folga
 
-    def _build_panel(self, md, fm) -> pd.DataFrame:
+    def _build_panel(self, dados_mercado, modelo_fatores) -> pd.DataFrame:
+        """Cada sinal implementa aqui a sua METRICA como painel (data x acao)."""
         raise NotImplementedError
 
-    def compute(self, md, fm, date, universe) -> pd.Series:
-        key = (id(md.returns), len(md.returns))
-        if getattr(self, "_panel_key", None) != key:
-            self._panel = self._build_panel(md, fm)
-            self._panel_key = key
+    def compute(self, dados_mercado, modelo_fatores, data, universo) -> pd.Series:
+        # Cache: o painel inteiro e caro de construir, mas so muda se os dados mudarem
+        chave_cache = (id(dados_mercado.returns), len(dados_mercado.returns))
+        if getattr(self, "_panel_key", None) != chave_cache:
+            self._panel = self._build_panel(dados_mercado, modelo_fatores)
+            self._panel_key = chave_cache
 
-        sub = self._panel.loc[:date]
-        if len(sub) == 0:
-            return pd.Series(dtype=float)
-        last = sub.index[-1]
-        if (pd.Timestamp(date) - last).days > self.max_staleness_days:
+        # Corta o painel ate a data (nunca depois: anti-lookahead) e pega a ultima linha
+        painel_ate_hoje = self._panel.loc[:data]
+        if len(painel_ate_hoje) == 0:
             return pd.Series(dtype=float)
 
-        raw = sub.iloc[-1].reindex(universe)
-        return self._zscore(raw)
+        ultima_data_disponivel = painel_ate_hoje.index[-1]
+        dias_desatualizado = (pd.Timestamp(data) - ultima_data_disponivel).days
+        if dias_desatualizado > self.max_staleness_days:
+            return pd.Series(dtype=float)      # sinal velho demais: melhor nao operar
+
+        metrica_hoje = painel_ate_hoje.iloc[-1].reindex(universo)
+        return self._zscore(metrica_hoje)      # PASSO 3 -> sinal final

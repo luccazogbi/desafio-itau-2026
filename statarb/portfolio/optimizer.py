@@ -48,97 +48,117 @@ def optimize_weights(
 ) -> np.ndarray | None:
     import cvxpy as cp
 
-    r = cfg["risk"]
-    n = len(alpha)
-    if n < 10:
+    limites = cfg["risk"]              # bloco 'risk' do config: todos os limites do mandato
+    n_acoes = len(alpha)
+    if n_acoes < 10:
         return None
 
-    G = float(cfg["book"]["gross_usd"])
-    adv_safe = np.maximum(np.nan_to_num(adv, nan=0.0), 1e5)
+    book_usd = float(cfg["book"]["gross_usd"])                     # $1 bi
+    adv_seguro = np.maximum(np.nan_to_num(adv, nan=0.0), 1e5)      # evita divisao por ~0
 
-    w_cap = np.minimum(float(r["max_weight"]), float(r["liquidity_cap_adv_mult"]) * adv_safe / G)
-    t_cap = float(r["participation_cap"]) * adv_safe / G
+    # --- Limites por acao (em fracao do book) ---
+    # cap_posicao: nao concentrar demais NEM passar da liquidez do nome
+    cap_posicao = np.minimum(float(limites["max_weight"]),
+                             float(limites["liquidity_cap_adv_mult"]) * adv_seguro / book_usd)
+    # cap_trade: nao negociar mais que X% do volume diario daquela acao
+    cap_trade = float(limites["participation_cap"]) * adv_seguro / book_usd
 
-    # tolerancias adaptativas: garantem factibilidade mesmo se w_prev degradou.
-    # LIMITADAS (min): sem o teto, uma solucao ruim que escapasse relaxaria as
-    # tolerancias do dia seguinte e o erro cresceria em cascata (bug pego na
-    # validacao com E/P: gross chegou a 6.9x o orcamento).
-    net_prev = abs(float(w_prev.sum()))
-    reach = float(t_cap.sum())
-    net_tol = min(max(float(r["net_tolerance"]), net_prev - 0.8 * reach), 0.05)
+    # --- Tolerancias adaptativas: garantem que exista solucao mesmo se a carteira
+    # atual (w_prev) tiver degradado. LIMITADAS por um teto: sem ele, uma solucao
+    # ruim relaxaria as tolerancias do dia seguinte e o erro cresceria em cascata
+    # (bug real pego na validacao com E/P: o gross chegou a 6,9x o orcamento).
+    net_atual = abs(float(w_prev.sum()))
+    alcance_de_ajuste = float(cap_trade.sum())        # quanto da p/ corrigir em 1 dia
+    tol_net = min(max(float(limites["net_tolerance"]),
+                      net_atual - 0.8 * alcance_de_ajuste), 0.05)
 
-    expo_prev = np.abs(B.T @ w_prev)
-    eps = np.minimum(
-        np.maximum(float(r["factor_exposure_bound"]), 0.5 * expo_prev), 0.10
-    )
+    exposicao_atual = np.abs(B.T @ w_prev)
+    tol_fator = np.minimum(
+        np.maximum(float(limites["factor_exposure_bound"]), 0.5 * exposicao_atual), 0.10)
 
-    w = cp.Variable(n)
-    dw = w - w_prev
+    # --- Variavel de decisao e funcao objetivo ---
+    pesos = cp.Variable(n_acoes)          # o que queremos descobrir
+    trades = pesos - w_prev               # quanto e preciso negociar para chegar la
 
-    risk = cp.sum_squares(F_chol.T @ (B.T @ w)) + cp.sum_squares(cp.multiply(ivol, w))
-    cost = cost_model.cvxpy_cost(dw, sigma_total, adv_safe)
-    objective = cp.Maximize(
-        OBJ_SCALE * (alpha @ w - float(r["risk_aversion"]) * risk - cost)
-    )
+    # risco = variancia do book na forma fatorada (B F B' + D), nunca a matriz N x N
+    risco = (cp.sum_squares(F_chol.T @ (B.T @ pesos))          # parte dos fatores
+             + cp.sum_squares(cp.multiply(ivol, pesos)))       # parte idiossincratica
+    custo = cost_model.cvxpy_cost(trades, sigma_total, adv_seguro)
 
-    constraints = [
-        cp.abs(cp.sum(w)) <= net_tol,
-        cp.norm1(w) <= 1.0,
-        cp.abs(B.T @ w) <= eps,
-        cp.abs(w) <= np.maximum(w_cap, np.abs(w_prev) * 0.0),  # cap fixo (>=0)
-        cp.abs(dw) <= t_cap,
+    objetivo = cp.Maximize(
+        OBJ_SCALE * (alpha @ pesos - float(limites["risk_aversion"]) * risco - custo))
+
+    restricoes = [
+        cp.abs(cp.sum(pesos)) <= tol_net,        # dollar-neutral: soma dos pesos ~ 0
+        cp.norm1(pesos) <= 1.0,                  # orcamento bruto: soma |pesos| <= book
+        cp.abs(B.T @ pesos) <= tol_fator,        # neutro a cada fator FF5+MOM
+        cp.abs(pesos) <= cap_posicao,            # concentracao + liquidez por acao
+        cp.abs(trades) <= cap_trade,             # participacao maxima no volume do dia
     ]
 
-    # NEUTRALIDADE SETORIAL: o residuo FF5+MOM nao remove comovimento de
-    # industria; sem este limite o book poderia virar aposta setorial disfarcada
-    S = sec_eff = None
+    # --- NEUTRALIDADE SETORIAL: o residuo FF5+MOM nao remove comovimento de
+    # industria; sem este limite o book poderia virar aposta setorial disfarcada.
+    matriz_setores = tol_setor = None
     if sectors is not None:
-        _, sec_idx = np.unique(np.asarray(sectors), return_inverse=True)
-        S = np.zeros((n, sec_idx.max() + 1))
-        S[np.arange(n), sec_idx] = 1.0
-        sb = float(r.get("sector_net_bound", 0.05))
-        sec_eff = np.minimum(np.maximum(sb, 0.5 * np.abs(S.T @ w_prev)), 0.15)
-        constraints.append(cp.abs(S.T @ w) <= sec_eff)
+        # matriz_setores: (n_acoes x n_setores), 1 na coluna do setor da acao.
+        # Assim, matriz_setores.T @ pesos = soma dos pesos DENTRO de cada setor.
+        _, indice_setor = np.unique(np.asarray(sectors), return_inverse=True)
+        matriz_setores = np.zeros((n_acoes, indice_setor.max() + 1))
+        matriz_setores[np.arange(n_acoes), indice_setor] = 1.0
 
-    prob = cp.Problem(objective, constraints)
-    for solver in SOLVERS:
+        limite_setor = float(limites.get("sector_net_bound", 0.05))
+        exposicao_setorial_atual = np.abs(matriz_setores.T @ w_prev)
+        tol_setor = np.minimum(
+            np.maximum(limite_setor, 0.5 * exposicao_setorial_atual), 0.15)
+        restricoes.append(cp.abs(matriz_setores.T @ pesos) <= tol_setor)
+
+    prob = cp.Problem(objetivo, restricoes)
+    # Tenta os solvers em cascata: o primeiro que devolver solucao VIAVEL ganha
+    for nome_solver in SOLVERS:
         try:
             with warnings.catch_warnings():
-                warnings.simplefilter("ignore")  # inaccurate-solution warnings
-                prob.solve(solver=getattr(cp, solver))
+                warnings.simplefilter("ignore")  # avisos de solucao imprecisa
+                prob.solve(solver=getattr(cp, nome_solver))
         except (cp.SolverError, Exception):
             continue
-        if prob.status in ("optimal", "optimal_inaccurate") and w.value is not None:
-            out = np.asarray(w.value).ravel()
-            out[np.abs(out) < 1e-6] = 0.0
-            # PORTAO DE VIABILIDADE: status 'inaccurate' pode devolver solucao
-            # que viola as restricoes de verdade. Nunca deixar isso entrar no book.
-            if _is_feasible(out, w_prev, B, eps, w_cap, t_cap, net_tol, S, sec_eff):
-                return out
-    return None  # caller mantem w_prev
+
+        if prob.status in ("optimal", "optimal_inaccurate") and pesos.value is not None:
+            pesos_resultado = np.asarray(pesos.value).ravel()
+            pesos_resultado[np.abs(pesos_resultado) < 1e-6] = 0.0   # limpa poeira numerica
+
+            # PORTAO DE VIABILIDADE: o status 'inaccurate' pode devolver solucao que
+            # viola as restricoes de verdade. Nunca deixar isso entrar no book.
+            if _respeita_mandato(pesos_resultado, w_prev, B, tol_fator, cap_posicao,
+                                 cap_trade, tol_net, matriz_setores, tol_setor):
+                return pesos_resultado
+
+    return None  # nenhum solver deu solucao viavel -> o motor mantem a carteira atual
 
 
-def _is_feasible(
-    w: np.ndarray, w_prev: np.ndarray, B: np.ndarray, eps: np.ndarray | float,
-    w_cap: np.ndarray, t_cap: np.ndarray, net_tol: float,
-    S: np.ndarray | None = None, sec_bound: np.ndarray | None = None,
-    tol: float = 5e-3,
+def _respeita_mandato(
+    pesos: np.ndarray, pesos_anteriores: np.ndarray, betas: np.ndarray,
+    tol_fator: np.ndarray | float, cap_posicao: np.ndarray, cap_trade: np.ndarray,
+    tol_net: float, matriz_setores: np.ndarray | None = None,
+    tol_setor: np.ndarray | None = None, folga: float = 5e-3,
 ) -> bool:
-    """Confere as restricoes do mandato com folga numerica pequena."""
-    if S is not None and not np.all(np.abs(S.T @ w) <= sec_bound + tol):
+    """Confere TODAS as restricoes do mandato, com pequena folga numerica."""
+    if not np.all(np.isfinite(pesos)):
         return False
-    if not np.all(np.isfinite(w)):
+    if matriz_setores is not None and not np.all(
+            np.abs(matriz_setores.T @ pesos) <= tol_setor + folga):
         return False
-    checks = (
-        abs(w.sum()) <= net_tol + tol
-        and np.abs(w).sum() <= 1.0 + tol
-        and np.all(np.abs(B.T @ w) <= np.asarray(eps) + tol)
-        and np.all(np.abs(w) <= w_cap + tol)
-        and np.all(np.abs(w - w_prev) <= t_cap + tol)
-    )
-    return bool(checks)
+
+    dollar_neutral = abs(pesos.sum()) <= tol_net + folga
+    dentro_do_book = np.abs(pesos).sum() <= 1.0 + folga
+    neutro_a_fatores = np.all(np.abs(betas.T @ pesos) <= np.asarray(tol_fator) + folga)
+    respeita_concentracao = np.all(np.abs(pesos) <= cap_posicao + folga)
+    respeita_participacao = np.all(np.abs(pesos - pesos_anteriores) <= cap_trade + folga)
+
+    return bool(dollar_neutral and dentro_do_book and neutro_a_fatores
+                and respeita_concentracao and respeita_participacao)
 
 
-def to_series(w: np.ndarray, names: list[str]) -> pd.Series:
-    s = pd.Series(w, index=names)
-    return s[s != 0.0]
+def to_series(pesos: np.ndarray, nomes_acoes: list[str]) -> pd.Series:
+    """Converte o vetor de pesos em Series (acao -> peso), sem as posicoes zeradas."""
+    serie_pesos = pd.Series(pesos, index=nomes_acoes)
+    return serie_pesos[serie_pesos != 0.0]
