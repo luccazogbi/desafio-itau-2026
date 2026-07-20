@@ -80,11 +80,15 @@ beta com **SPY**. Sinal oficial: **`resid_ou`** (reversão de resíduo, Avellane
 - [x] **Backtest oficial do `resid_ou`** no S&P 500 as-of (dev+val; holdout trancado)
 - [x] Métricas: Sharpe líquido, turnover, drawdown, decomposição de custos (gross → net)
 - [x] Confirmar neutralidade de fatores + SETORIAL e hedge SPY nos dados reais
-- [ ] **Análise de capacidade** (alfa líquido × tamanho do book) — custos comem 63% do
-      bruto em $1bi; book menor deve reter muito mais → análise-chave p/ o relatório
-- [ ] Cenários de crise (queda de 2020, bear de 2022) — análise honesta
+- [x] **Análise de capacidade** (18/07, `scripts/11`, `results/02`): backtest re-rodado em
+      5 tamanhos — Sharpe líq. 0,37 ($100mm) → 0,20 ($1bi), monotônico. Faixa sustentável:
+      **$100–300mm**; em books pequenos o piso de custo vira o SPREAD (alavanca = reduzir giro)
+- [x] **Análise de regime de volatilidade** (18/07, `scripts/12`, `results/03`): IC por tercil
+      de vol do SPY = **−0,00 / +0,06 / +0,08** (baixa/média/ALTA) → 2023 foi REGIME, não
+      decaimento; a estratégia é provisão de liquidez (ganha quando o mercado precisa)
 - [ ] Crosscheck `bt` nos dados reais
 - [ ] Ida única ao **holdout** (2024+) — número final da estratégia
+- [ ] (evolução proposta, NÃO retro-ajustar) condicionar gross/rebalance ao regime de vol
 
 ## 5. Otimização & Custos — calibração final
 

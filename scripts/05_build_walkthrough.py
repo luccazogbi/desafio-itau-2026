@@ -308,6 +308,17 @@ própria* nos últimos ~3 meses. Economicamente, é o **afastamento do equilíbr
 fatores** que a tese diz que reverte. Resíduos de um único dia são ruído; somá-los revela
 a tendência.
 
+> **Por que somatório e não produtório?** Para o retorno de um ativo *investido*, o
+> acumulado composto seria $\\prod(1+r)-1$. Mas $\\varepsilon$ não é isso: é o **P&L
+> diário de uma posição hedgeada de exposição constante** (long \\$1 na ação, short
+> $\\beta$·\\$1 nos fatores — o objeto que a regressão define), e P&L com exposição
+> constante acumula **aditivamente**. Além disso, o arcabouço OU exige um processo
+> aditivo — e o produtório em log colapsa de volta no somatório
+> ($\\log\\prod(1+\\varepsilon) = \\sum\\log(1+\\varepsilon) \\approx \\sum\\varepsilon$).
+> É também o que o paper faz (o "processo auxiliar" do A&L é $\\sum\\varepsilon_j$).
+> *Verificação empírica nos nossos dados:* as duas versões têm correlação de postos
+> **0,9987** e IC idêntico (0,0460 vs 0,0464) — diferença sem impacto prático.
+
 **Passo 2 — Comparar com o histórico da PRÓPRIA ação:**
 
 $$ s_i(t) = -\\,\\frac{X_i(t) - \\mu_i(t)}{\\sigma_i(t)} $$
@@ -733,6 +744,78 @@ for ano, retornos_ano in retorno_diario_liquido.groupby(resultado_diario.index.y
     retorno_anualizado = retornos_ano.mean() * 252 * 100
     sharpe_ano = retornos_ano.mean() / retornos_ano.std() * np.sqrt(252)
     print(f"  {ano}: {retorno_anualizado:+6.2f}%  |  {sharpe_ano:+.2f}")
+""")
+
+md("""
+### 7.1 Análise de capacidade — qual o tamanho certo do book?
+
+O diagnóstico do backtest apontou que **os custos comem 63% do alfa** no book de $1 bi —
+e o impacto de mercado (62% do custo) **cresce com o tamanho do trade**. A pergunta
+natural: *quanto alfa sobrevive em books menores?*
+
+Para responder com rigor, o backtest completo foi **re-rodado** em 5 tamanhos de book
+(`scripts/11_capacity_analysis.py`) — não é uma aproximação de escala: o otimizador
+reage ao tamanho (caps de liquidez e penalidade de impacto mudam as decisões).
+
+A leitura esperada: **o alfa é real, mas tem capacidade finita** — o tamanho do book é
+uma decisão de desenho tão importante quanto o próprio sinal.
+""")
+
+code("""
+# ---- Curva de capacidade: Sharpe liquido e P&L por tamanho de book ----
+# Cada linha veio de um backtest COMPLETO (dev+val) naquele tamanho.
+curva_capacidade = pd.read_parquet(raiz_projeto / "reports" / "capacity_analysis.parquet")
+
+fig, eixos = plt.subplots(1, 2, figsize=(14, 5))
+curva_capacidade["sharpe_liquido"].plot(ax=eixos[0], marker="o",
+                                        color=PALETTE["strategy"], label="Sharpe liquido")
+curva_capacidade["sharpe_bruto"].plot(ax=eixos[0], marker="o", ls="--",
+                                      color=PALETTE["gross"], label="Sharpe bruto")
+eixos[0].set_title("7.1a  Capacidade: Sharpe vs tamanho do book")
+eixos[0].set_xlabel("book bruto (USD mm)"); eixos[0].legend()
+curva_capacidade["pnl_liquido_usd_mm"].plot(ax=eixos[1], marker="o", color=PALETTE["cost"])
+eixos[1].set_title("7.1b  P&L liquido acumulado 2020-23 (USD mm)")
+eixos[1].set_xlabel("book bruto (USD mm)")
+plt.show()
+
+curva_capacidade.round(3)
+""")
+
+md("""
+### 7.2 Regime de volatilidade — quando a estratégia ganha (e quando não há o que ganhar)
+
+2023 foi negativo. **Decaimento do alfa ou dependência de regime?** Para separar as
+hipóteses, o desempenho E a qualidade pura do sinal (IC) foram medidos por **tercil da
+volatilidade realizada 21d do SPY**, defasada em 1 dia
+(`scripts/12_regime_analysis.py`).
+
+O teste decisivo é o **IC por regime**: se em vol baixa o IC for ~zero, não é que a
+estratégia "perde" em mercado calmo — é que **o fenômeno não existe** ali. Isso é
+exatamente o que a tese de **provisão de liquidez** prevê: sem estresse, não há
+vendedores apressados, não há sobre-reação, não há reversão a capturar.
+""")
+
+code("""
+# ---- Desempenho e IC por regime de volatilidade (tabelas do script 12) ----
+desempenho_por_regime = pd.read_parquet(raiz_projeto / "reports" / "regime_pnl.parquet")
+ic_por_regime = pd.read_parquet(raiz_projeto / "reports" / "regime_ic.parquet")
+
+fig, eixos = plt.subplots(1, 2, figsize=(14, 5))
+desempenho_por_regime[["sharpe_bruto", "sharpe_liq"]].plot(
+    kind="bar", ax=eixos[0], color=[PALETTE["gross"], PALETTE["strategy"]], alpha=0.9)
+eixos[0].axhline(0, color="k", lw=0.8)
+eixos[0].set_title("7.2a  Sharpe por regime de vol do SPY")
+ic_por_regime["ic_medio"].plot(kind="bar", ax=eixos[1], color=PALETTE["iwm"], alpha=0.9)
+eixos[1].axhline(0, color="k", lw=0.8)
+eixos[1].set_title("7.2b  IC do sinal por regime (qualidade pura)")
+plt.show()
+
+print("Desempenho por regime:"); print(desempenho_por_regime.to_string())
+print(); print("IC por regime:"); print(ic_por_regime.to_string())
+print()
+print("Contexto anual: 2020 vol 26% | 2021 vol 12% | 2022 vol 24% | 2023 vol 13%")
+print("=> 2023 (vol baixa) nao foi decaimento: foi REGIME. Em vol baixa o IC e ~0 --")
+print("   o fenomeno que exploramos (sobre-reacao a fluxo) simplesmente nao ocorre.")
 """)
 
 # ============================================================ 8. Fecho
