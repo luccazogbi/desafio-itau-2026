@@ -42,7 +42,9 @@ beta com **SPY**. Sinal oficial: **`resid_ou`** (reversão de resíduo, Avellane
 - [x] Market cap (proxy) — `scripts/07b_add_marketcap_sp500.py`
 - [x] **Cobertura medida = 91,7%** dos membros as-of (viés residual quantificado no `meta.json`)
 - [x] **Estudo que justifica S&P 500 vs R2000** — `scripts/08_delisted_coverage.py` (18% vs 92%)
+- [ ] Estamos operando ações do universo as-of que somente possuem preço disponível? Está sendo feita essa validação? 
 - [ ] (opcional) Ampliar janela para 2010+ se o relatório pedir histórico mais longo
+
 
 ## 2. Modelo de Fatores — validado nos dados reais
 
@@ -118,8 +120,7 @@ beta com **SPY**. Sinal oficial: **`resid_ou`** (reversão de resíduo, Avellane
   (`INDX_MWEIGHT_HIST`, TRI, EPS PIT) — o pipeline lê o mesmo schema, é só trocar a fonte.
 - **Small caps / Russell 2000**: só viável com **WRDS/CRSP** (checar faculdade), **Sharadar**
   (~US$45/mês) ou **Bloomberg** — inviável no gratuito (medido: 18% de cobertura das deslistadas).
-- **Nasdaq-100 histórico** (projeto de pesquisa do orientador): rota QQQ/IWM via **SEC EDGAR
-  N-PORT** + OpenFIGI documentada.
+
 - Scripts legados: `06_pull_yfinance.py` (proxy R2000, substituído pelo `07`); `01_pull_bloomberg.py`
   (aguarda acesso). Sinais dormentes (`trend_factor`, `mad`, `str_turnover`, `left_tail`,
   `seasonality`, `earnings_yield`, `blend`) — implementados, testados, não usados na estratégia atual.

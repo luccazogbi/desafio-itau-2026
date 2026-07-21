@@ -11,7 +11,7 @@ com Q = |dw|*G; custo total = impacto * Q => eta*sigma*sqrt(G/ADV)*|dw|^1.5.
 
 Todos os termos sao CONVEXOS em dw => o mesmo modelo entra (i) como
 penalidade dentro do otimizador cvxpy e (ii) como debito realizado no
-backtest. Essa consistencia otimizador<->simulacao e deliberada: o
+backtest. Essa consistencia otimizador<->simulacao é deliberada: o
 portfolio ja nasce ciente do proprio footprint.
 """
 
