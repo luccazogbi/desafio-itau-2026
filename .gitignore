@@ -6,8 +6,10 @@ __pycache__/
 .ipynb_checkpoints/
 
 # dados e resultados: regeneraveis pelos scripts (~150 MB) -> nao versionar
-data/
-reports/
+# ATENCAO: a barra inicial ANCORA na raiz do repo. Sem ela, 'data/' apagaria
+# tambem o pacote statarb/data/ (loaders, universe, synthetic) -- bug ja pego.
+/data/
+/reports/
 
 # temporarios / OS
 *.log

@@ -60,16 +60,23 @@ operando acima da sua capacidade**.
 
 ### 3.2 Capacidade: o mesmo sinal em book menor
 
-Como o impacto escala com √Q, reduzir o book melhora muito o líquido:
+Como o impacto de mercado cresce com o tamanho do trade, reduzir o book melhora o
+líquido. **A análise rigorosa está em [`results/02_analise_capacidade.md`](02_analise_capacidade.md)**,
+onde o backtest foi RE-RODADO em cada tamanho (o otimizador reage ao book):
 
 | Book | Sharpe líquido | Retorno líquido |
 |---|---:|---:|
 | **$1.000mm** (atual) | +0,20 | +1,2% a.a. |
-| $300mm | +0,29 | +5,8% a.a. |
-| $100mm | **+0,34** | **+20,2% a.a.** |
+| $300mm | +0,30 | +1,8% a.a. |
+| $100mm | **+0,37** | **+2,3% a.a.** |
 
 *Mesmo sinal, mesma execução — só menos capital.* Este é o achado mais acionável da
-análise: o tamanho do book, e não o sinal, é o principal limitante hoje.
+análise: o tamanho do book, e não o sinal, é o principal limitante hoje. A faixa
+sustentável é ~$100–300mm; o mandato de $1 bi está acima da capacidade.
+
+> Nota: uma versão anterior desta tabela usava uma aproximação por escala (√Q) e
+> reportava +20,2% a.a. para $100mm — número **incorreto**, substituído pelos valores
+> do backtest completo acima.
 
 ### 3.3 O alfa bruto já é fraco em large caps (Sharpe 0,53 antes de custos)
 

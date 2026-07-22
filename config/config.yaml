@@ -52,10 +52,14 @@ signal_params:                     # parametros da biblioteca de sinais (roadmap
   overnight: {window: 21, min_obs: 15}                           # Lou-Polk-Skouras JFE 2019
   salience: {theta: 0.1, delta: 0.7, window: 21, refresh_days: 5}  # Cosemans-Frehen JFE 2021 (valores do paper, NAO otimizar)
 
-blend:                             # combinador: alfa = soma(w_k * z_k), re-normalizado
-  components:                      # decidido pelo funil no S&P 500 as-of (13/07):
-    resid_ou: 1.0                  # nucleo robusto (IC21 t~4 dev / t~2 val)
-    str_turnover: 0.5              # diversificador fraco (tilt menor); testar se agrega
+blend:                             # combinador (NAO USADO na estrategia final)
+  # DECISAO 13-14/07: blend DESCARTADO. O funil testou 11 candidatos e so o
+  # resid_ou tem IC robusto nos dois splits; combinar com os outros nao agrega
+  # (str_turnover reduziu o IC). O sinal oficial e resid_ou sozinho.
+  # Este bloco fica so para reproduzir a analise de blend (scripts/09).
+  components:
+    resid_ou: 1.0
+    str_turnover: 0.5
 
 funnel:                            # protocolo anti-overfitting (doc de sinais, secao 16)
   dev_end: "2022-12-31"            # desenvolvimento
@@ -94,4 +98,6 @@ execution:
 
 hedge:
   enabled: true
-  instrument: IWM                  # ETF Russell 2000 p/ zerar beta residual de mercado
+  instrument: SPY                  # ETF do S&P 500 p/ zerar o beta de mercado residual
+                                   # (o painel grava o ETF de hedge em etf_iwm.parquet,
+                                   #  nome legado do slot; no S&P 500 as-of contem SPY)
