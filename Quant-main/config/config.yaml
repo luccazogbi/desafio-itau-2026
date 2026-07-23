@@ -1,0 +1,137 @@
+# =============================================================================
+# Configuracao central do pipeline StatArb L/S - Desafio Quant AI 2026
+# Todos os parametros do projeto vivem aqui. Nada hard-coded nos modulos.
+# =============================================================================
+
+paths:
+  data_raw: data/raw               # dumps brutos (Bloomberg / sintetico)
+  data_processed: data/processed   # painel limpo no schema canonico
+  reports: reports                 # metricas, graficos, tearsheet
+
+data:
+  source: synthetic                # synthetic | bloomberg  (rotulo da FONTE do painel)
+  panel: processed_sp500           # subpasta de data/ efetivamente usada nas rodadas
+                                   #   oficiais; 'processed' = painel sintetico.
+                                   #   Sobrescrevivel por --data no CLI.
+  start: "2018-01-02"              # inicio do painel de dados
+  end: "2024-12-31"                # ate onde o painel e BAIXADO (nao avaliado)
+
+backtest:
+  start: "2020-01-02"              # inicio da simulacao (precisa de historico p/ betas)
+  end: "2023-12-31"                # FIM DE DEV+VALIDACAO -- default deliberado.
+                                   #   Antes era 2024-12-31, o que fazia uma rodada sem
+                                   #   flags entrar no holdout por acidente.
+  holdout_start: "2024-01-01"      # daqui p/ frente e HOLDOUT: UMA unica ida, so com
+                                   #   --allow-holdout explicito. O motor recusa rodar
+                                   #   alem desta data sem a flag (guarda em engine.py).
+
+universe:
+  min_price: 1.0                   # evita penny stocks
+  min_adv_usd: 1.0e6               # ADV minimo (USD) para ser negociavel
+  min_history_days: 260            # historico minimo p/ estimar beta/vol
+  membership_ffill_limit_days: 35  # snapshot mensal -> diario (limite do ffill)
+
+book:
+  gross_usd: 1.0e9                 # book bruto: $1 bi ($500mm por perna)
+  # net = 0 por construcao (dollar-neutral no otimizador)
+
+signal:
+  name: resid_ou                   # SINAL OFICIAL (decidido pelo funil em 13-14/07;
+                                   # 3 candidatos extras testados e cortados)
+  zscore_cap: 3.0                  # winsorizacao do z-score cross-sectional
+  alpha_bps_per_z: 3.0             # alfa diario esperado (bps) por unidade de z
+                                   # calibrado a priori: alpha ~ IC x vol_idio
+                                   # (IC~0.02, vol idio diaria ~1.5% => ~3bps);
+                                   # 5bps deixava o otimizador superconfiante -> giro 25x/ano
+  horizon_days: 21                 # horizonte de amortizacao do alfa vs custo de entrada
+                                   # (otimizador de 1 periodo e miope: sem isso ele compara
+                                   #  1 dia de alfa contra o custo TOTAL do trade e nao opera)
+                                   # Guia por sinal: resid_ou 5bps/21d | E/P 4/21 | idio_reversal 8/4
+  lookback_days: 5                 # (idio_reversal) janela da reversao de curto prazo
+
+signal_params:                     # parametros da biblioteca de sinais (roadmap 3b)
+  trend_factor: {ma_grid: [3, 5, 10, 20, 50, 100, 200, 400], smooth_months: 12, min_names: 50}
+  mad: {short_ma: 21, long_ma: 200}
+  str_turnover: {ret_window: 21, to_window: 21, low_to_quantile: 0.25}
+  stm: {ret_window: 21, to_window: 21, high_to_quantile: 0.75}   # Medhat-Schmeling RFS 2022
+  resid_ou: {accum_days: 60, z_window: 252}
+  left_tail: {window: 250, min_obs: 200, quantile: 0.01, refresh_days: 21}
+  seasonality: {min_years: 3, max_years: 10}
+  overnight: {window: 21, min_obs: 15}                           # Lou-Polk-Skouras JFE 2019
+  salience: {theta: 0.1, delta: 0.7, window: 21, refresh_days: 5}  # Cosemans-Frehen JFE 2021 (valores do paper, NAO otimizar)
+
+blend:                             # combinador (NAO USADO na estrategia final)
+  # DECISAO 13-14/07: blend DESCARTADO. O funil testou 11 candidatos e so o
+  # resid_ou tem IC robusto nos dois splits; combinar com os outros nao agrega
+  # (str_turnover reduziu o IC). O sinal oficial e resid_ou sozinho.
+  # Este bloco fica so para reproduzir a analise de blend (scripts/09).
+  components:
+    resid_ou: 1.0
+    str_turnover: 0.5
+
+funnel:                            # protocolo anti-overfitting (doc de sinais, secao 16)
+  dev_end: "2022-12-31"            # desenvolvimento
+  val_end: "2023-12-31"            # validacao; holdout = 2024+ (uma unica ida,
+  eval_every_days: 5               #   somente com --include-holdout explicito)
+  horizons: [1, 5, 21]             # dias uteis a frente p/ IC (apos lag de execucao)
+
+factors:
+  names: [mkt, smb, hml, rmw, cma, mom]   # FF5 + Momentum
+  beta_window: 252                 # janela da regressao rolling
+  beta_min_obs: 126                # minimo de observacoes validas
+  estimation_every_days: 21        # re-estima betas a cada ~1 mes (betas sao lentos)
+
+risk:
+  cov_window: 252                  # janela da covariancia de fatores
+  risk_aversion: 7.143             # lambda do termo de risco no otimizador.
+                                   # UNIDADE: variancia no HORIZONTE de manutencao
+                                   # (signal.horizon_days), a mesma unidade do alfa.
+                                   # Antes valia 150 contra a variancia de 1 DIA, o
+                                   # que subpenalizava risco em 21x sem que o numero
+                                   # revelasse isso. 150/21 = 7,143 resolve EXATAMENTE
+                                   # o mesmo problema: e correcao de unidade, nao
+                                   # recalibragem -- os resultados nao se movem.
+  factor_exposure_bound: 0.02      # |beta do book| <= 2% do gross, por fator
+  sector_net_bound: 0.05           # |net por setor| <= 5% do gross (residuo FF nao
+                                   #   remove industria -- sem isso o book poderia
+                                   #   virar aposta setorial disfarcada)
+  net_tolerance: 0.002             # tolerancia p/ dollar-neutrality (fracao do gross)
+  max_weight: 0.005                # 0.5% do gross por nome (concentracao)
+  liquidity_cap_adv_mult: 1.0      # |posicao| <= 1x ADV do nome
+  participation_cap: 0.05          # |trade diario| <= 5% do ADV do nome
+
+costs:                             # modelo Almgren-Chriss (impacto de mercado)
+  # CALIBRADO em 23/07 com ADV/vol reais do S&P 500 (scripts/14_cost_calibration.py).
+  # Dos 3 parametros, so o spread era estimavel com dado diario -- ver results/05.
+  spread_bps: 4.0                  # MEDIDO: Corwin-Schultz da 5,55 bps round-trip
+                                   #   (meio-spread 2,8) + ~1 bp de corretagem/taxas.
+                                   #   Era 5.0 por literatura -- conservador em ~25%.
+                                   #   Monotonico na liquidez: D1 8,1 -> D10 3,8 bps.
+  ac_eta: 0.5                      # coef. impacto temporario (sqrt-law).
+                                   #   NAO estimavel com preco diario (exige fills da
+                                   #   ordem-mae; Almgren 2005 usou base do Citi).
+                                   #   Mantido: implica 7,1 bps a 1% do ADV, dentro da
+                                   #   faixa publicada de 5-15 bps p/ large caps US.
+  ac_gamma: 0.05                   # coef. impacto permanente (linear).
+                                   #   NAO estimavel: a rota do Amihud DEGENERA --
+                                   #   ILLIQ x ADV ~ E|r|, entao gamma ~ E|r|/sigma
+                                   #   ~ 0,66 para qualquer acao (medido: identico em
+                                   #   todos os 10 decis de liquidez). Mantido.
+  adv_window: 21                   # janela (dias) do ADV mediano
+  borrow_bps_per_year: 40.0        # ALUGUEL da perna short (general collateral em
+                                   #   large caps: 25-50 bps/ano). Debitado dia a dia
+                                   #   sobre |posicoes vendidas|. Era o unico custo
+                                   #   relevante que o modelo ignorava -- estava
+                                   #   documentado so no PIPELINE v1 arquivado.
+                                   #   0.0 reproduz o comportamento antigo.
+
+execution:
+  lag_days: 1                      # sinal no close de t -> executa no close de t+1 (anti-lookahead)
+  rebalance_every_days: 3          # decisao a cada 3 dias uteis: coerente com sinal
+                                   # de horizonte ~21d (score quase nao muda em 1 dia)
+
+hedge:
+  enabled: true
+  instrument: SPY                  # ETF do S&P 500 p/ zerar o beta de mercado residual
+                                   # (o painel grava o ETF de hedge em etf_iwm.parquet,
+                                   #  nome legado do slot; no S&P 500 as-of contem SPY)

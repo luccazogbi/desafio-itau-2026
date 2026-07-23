@@ -1,0 +1,24 @@
+numpy>=1.26,<2.0
+pandas>=2.1
+pyarrow>=14
+scipy>=1.11
+cvxpy>=1.4
+clarabel>=0.6
+osqp>=0.6.3
+ecos>=2.0.12
+matplotlib>=3.8
+PyYAML>=6.0
+yfinance>=0.2.40                 # precos/volume (painel S&P 500 as-of, scripts 06/07)
+bt>=1.0.30
+ffn>=1.0.0
+tabulate>=0.9                    # .to_markdown() nos relatorios .md
+pytest>=8.0
+
+# --- notebook explicativo (scripts/05_build_walkthrough.py) ---
+nbformat>=5.9
+nbclient>=0.9
+ipykernel>=6.29
+
+# --- Bloomberg (instalar SOMENTE na maquina com terminal) ---
+# pip install blpapi --index-url=https://blpapi.bloomberg.com/repository/releases/python/simple/
+# pip install xbbg
