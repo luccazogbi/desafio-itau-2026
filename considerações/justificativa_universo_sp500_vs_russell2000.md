@@ -57,7 +57,14 @@ dados gratuitos?**
 
 ## 4. A medição empírica
 
-**Método** (reprodutível — `scripts/08_delisted_coverage.py`):
+**Método** — `scripts/08_delisted_coverage.py`:
+
+> ⚠️ **Ressalva de reprodutibilidade (verificada em 23/07/2026).** O script carrega
+> `data/raw/iwm_2019_split.pkl` (a classificação removidos/sobreviventes do IWM), e
+> **nenhum script deste repositório gera esse arquivo** — o download dos holdings via
+> SEC EDGAR foi feito ad-hoc e não foi versionado. Os números abaixo estão
+> **documentados, mas não são re-deriváveis** a partir do repositório hoje. Fechar
+> essa lacuna exige implementar o passo 1 dentro do script.
 
 1. Baixar as posições do IWM em **nov/2019** e **jul/2026** via SEC EDGAR N-PORT.
 2. Classificar cada nome de 2019 em **"removido"** (fora do índice em 2026) ou
@@ -81,8 +88,23 @@ dados gratuitos?**
 | **Gap de cobertura (viés residual)** | | **74 pontos percentuais** |
 
 Para comparação, o mesmo procedimento aplicado ao **S&P 500 as-of** resulta em
-**91,7%** de cobertura média dos membros históricos — porque large caps que saem do
-índice geralmente o fazem por **aquisição** (mantendo histórico), e não por falência.
+**92,8%** de cobertura média dos membros históricos — porque large caps que saem do
+índice geralmente o fazem por **aquisição**, e não por falência.
+
+> **Atualização de 22/07.** Este número era **91,7%** até a auditoria de composição
+> (`scripts/13_membership_audit.py`) revelar que **20% do gap não era falta de dado,
+> e sim 23 renomeações de ticker não tratadas** — a empresa continuava no índice sob
+> outro símbolo, e o painel a perdia por inteiro no período anterior à troca. Corrigido;
+> cobertura subiu para 92,8% (mínimo mensal de 83,8% para 86,1%). Detalhes em
+> [`results/04`](../results/04_auditoria_membership_e_cobertura.md).
+>
+> **Ressalva que a análise acima não capturava:** a premissa "aquisição mantém histórico"
+> é **falsa no yfinance**. Quando a empresa é adquirida, o histórico inteiro é apagado —
+> inclusive os anos em que ela era constituinte saudável. Medido: **3,45% dos meses-membro
+> de 2020-2023** pertencem a empresas adquiridas depois de 2023 (Hologic, Kellanova,
+> Interpublic, Ansys, Hess, Juniper…). E esse número **cresce a cada nova aquisição** —
+> o painel do S&P 500 gratuito também se degrada com o tempo, só que mais devagar que o
+> do R2000. A conclusão da seção 7 **não muda**; o custo assumido é maior do que parecia.
 
 ---
 
@@ -128,4 +150,8 @@ yfinance) é reprodutível e reaproveitável.
 - `scripts/08_delisted_coverage.py` — código da medição
 - `reports/delisted_coverage.md` / `.json` — resultados brutos
 - `scripts/07_pull_sp500_asof.py` — construção do painel S&P 500 as-of adotado
-- `data/processed_sp500/meta.json` — cobertura do universo adotado (91,7%)
+- `data/processed_sp500/meta.json` — cobertura do universo adotado (**92,8%** após a
+  correção de renomeações de 22/07; era 91,7%)
+- `scripts/13_membership_audit.py` — auditoria da composição as-of e do gap de preços
+- `results/04_auditoria_membership_e_cobertura.md` — interpretação, incluindo a erosão
+  retroativa que **cresce** a cada aquisição

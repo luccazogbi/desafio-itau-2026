@@ -13,36 +13,53 @@
 
 ### Desempenho da estratégia por regime (dev+val, 2020–2023)
 
+> **Atualizado em 23/07/2026** — regerado após as correções de 22/07 e a calibração de custos.
+
 | Regime | Vol média SPY | Sharpe bruto | Sharpe líquido | Ret. líquido a.a. |
 |---|---:|---:|---:|---:|
-| Vol baixa | 10% | +0,29 | **−0,34** | −1,0% |
-| Vol média | 16% | +0,38 | −0,25 | −0,8% |
-| **Vol ALTA** | 30% | **+0,79** | **+0,58** | **+5,4%** |
+| Vol baixa | 10% | +0,42 | **−0,26** | −0,8% |
+| Vol média | 16% | +0,33 | −0,33 | −1,1% |
+| **Vol ALTA** | 30% | **+0,74** | **+0,51** | **+4,8%** |
 
 ### Qualidade pura do sinal (IC, sem otimizador nem custos)
 
-| Regime | IC (fwd 21d) | t-stat |
-|---|---:|---:|
-| Vol baixa | **−0,003** | −0,2 → *o sinal não prevê NADA* |
-| Vol média | +0,064 | 3,4 |
-| **Vol ALTA** | **+0,080** | **4,1** |
+| Regime | IC (fwd 21d) | t ingênuo | **t Newey-West** | n |
+|---|---:|---:|---:|---:|
+| Vol baixa | **−0,004** | −0,26 | **−0,17** → *o sinal não prevê NADA* | 65 |
+| Vol média | +0,064 | 3,47 | **+2,51** | 65 |
+| **Vol ALTA** | **+0,079** | 4,08 | **+2,78** | 67 |
+
+> **Correção metodológica (22/07), agora com números medidos.** Os t-stats originais
+> assumiam ICs independentes, mas o IC olha 21 dias à frente numa grade de 5 dias —
+> medições vizinhas compartilham ~16 dias. `statarb/stats.py` aplica Newey-West com lag 4.
+>
+> **A correção é mais branda do que a estimativa grosseira sugeria.** O limite teórico
+> √(21/5) ≈ 2,05 previa t ≈ 2,0; o medido é **2,78** em vol alta e **2,51** em vol média —
+> queda de ~30%, não de 50%. Motivo: os pesos de Bartlett atenuam os lags mais distantes e
+> a autocorrelação real da série de ICs é menor que o máximo teórico.
+>
+> **O que isso significa:** o IC médio e a escada monotônica não mudam. Em vol alta,
+> **t = 2,78 continua significativo** a 5% — mais forte do que eu havia estimado. Mas
+> "t = 4,1" era exagero: a leitura honesta é que a evidência de dependência de regime é
+> **sólida, não esmagadora**, com 4 anos de amostra.
 
 ### O contexto anual que fecha o quebra-cabeça
 
 | Ano | Vol média SPY | Sharpe líquido do ano |
 |---|---:|---:|
-| 2020 | **26%** | **+0,52** ✓ |
-| 2021 | 12% | +0,22 |
-| 2022 | **24%** | +0,19 |
-| 2023 | 13% | **−0,70** ✗ |
+| 2020 | **26%** | **+0,44** ✓ |
+| 2021 | 12% | +0,26 |
+| 2022 | **24%** | +0,16 |
+| 2023 | 13% | **−0,71** ✗ |
 
 ---
 
 ## 2. Veredito: dependência de regime, não decaimento
 
 O teste decisivo é o **IC** — que mede o sinal *antes* de custos e carteira. Em vol baixa
-o IC é **estatisticamente zero**: não é que a estratégia "perde para os custos" em mercado
-calmo; é que **não há o que prever**. Em vol alta, o IC de 0,08 com t=4,1 é forte.
+o IC é **estatisticamente zero** (t = −0,17): não é que a estratégia "perde para os custos"
+em mercado calmo; é que **não há o que prever**. Em vol alta, o IC de 0,079 com **t = 2,78
+(Newey-West)** é significativo a 5%.
 
 2023 (vol 13%) foi um ano em que o fenômeno que exploramos simplesmente não ocorreu.
 Isso é **consistente com a tese econômica**, não uma anomalia dela:

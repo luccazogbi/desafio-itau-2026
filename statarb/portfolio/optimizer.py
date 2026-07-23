@@ -45,6 +45,7 @@ def optimize_weights(
     cost_model,
     cfg: dict,
     sectors: np.ndarray | None = None,  # (n,) rotulos de setor (str); None = sem restricao
+    horizon_days: int = 1,              # dias de manutencao -- ver nota de unidades
 ) -> np.ndarray | None:
     import cvxpy as cp
 
@@ -81,8 +82,16 @@ def optimize_weights(
     trades = pesos - w_prev               # quanto e preciso negociar para chegar la
 
     # risco = variancia do book na forma fatorada (B F B' + D), nunca a matriz N x N
-    risco = (cp.sum_squares(F_chol.T @ (B.T @ pesos))          # parte dos fatores
-             + cp.sum_squares(cp.multiply(ivol, pesos)))       # parte idiossincratica
+    risco_diario = (cp.sum_squares(F_chol.T @ (B.T @ pesos))    # parte dos fatores
+                    + cp.sum_squares(cp.multiply(ivol, pesos)))  # parte idiossincratica
+
+    # COERENCIA DE UNIDADES: `alpha` chega ja amortizado pelo horizonte de
+    # manutencao (alpha_diario x horizon_days), porque o custo de entrada e pago
+    # UMA vez e compete com o alfa acumulado ate a posicao ser desmontada.
+    # O risco tem de viver no MESMO horizonte -- senao o objetivo compara
+    # 21 dias de retorno contra 1 dia de variancia e subpenaliza risco em 21x.
+    # Sob incrementos iid, Var(H dias) ~ H x Var(1 dia).
+    risco = float(max(1, horizon_days)) * risco_diario
     custo = cost_model.cvxpy_cost(trades, sigma_total, adv_seguro)
 
     objetivo = cp.Maximize(

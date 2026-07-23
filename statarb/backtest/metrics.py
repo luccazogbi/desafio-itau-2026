@@ -42,9 +42,24 @@ def compute_metrics(res: pd.DataFrame, gross_usd: float) -> dict:
         "hit_rate_pct": float((daily_net > 0).mean() * 100),
         "avg_gross": float(res["gross"].mean()),
         "max_abs_net": float(res["net"].abs().max()),
+        # o livro REAL inclui o hedge; antes ele ficava fora e a neutralidade
+        # reportada era melhor do que a efetiva
+        "avg_gross_com_hedge": float(res["gross_com_hedge"].mean())
+        if "gross_com_hedge" in res else np.nan,
+        "max_abs_net_com_hedge": float(res["net_com_hedge"].abs().max())
+        if "net_com_hedge" in res else np.nan,
         "ann_turnover_x": float(res["turnover"].mean() * ANN),
         "total_costs_usd_mm": float(res["cost_usd"].sum() / 1e6),
         "costs_bps_of_gross_per_year": float(res["cost_usd"].sum() / gross_usd / years * 1e4),
+        # decomposicao dos custos em bps/ano (spread e impacto = execucao;
+        # aluguel = financiamento do short; deslistagem = liquidacao forcada)
+        **{
+            f"cost_{nome}_bps_per_year": float(res[col].sum() / gross_usd / years * 1e4)
+            if col in res else 0.0
+            for nome, col in [("spread", "spread_usd"), ("impact", "impact_usd"),
+                              ("borrow", "borrow_usd"), ("delist", "delist_usd"),
+                              ("hedge", "hedge_cost_usd")]
+        },
         "avg_n_positions": float(res["n_positions"].mean()),
         "max_abs_factor_expo": float(
             res[[c for c in res.columns if c.startswith("expo_")]].abs().max().max()
@@ -73,6 +88,7 @@ def write_report(
     lines = ["# Metricas do backtest\n", "| Metrica | Valor |", "|---|---:|"]
     fmt = {
         "period": ("Periodo", "{}"),
+        "snapshot": ("Snapshot do painel", "{}"),
         "ann_return_gross_pct": ("Retorno anual bruto (% do gross)", "{:.2f}%"),
         "ann_return_net_pct": ("Retorno anual liquido (% do gross)", "{:.2f}%"),
         "ann_vol_pct": ("Vol anualizada (%)", "{:.2f}%"),
@@ -81,17 +97,25 @@ def write_report(
         "sortino_net": ("Sortino liquido", "{:.2f}"),
         "max_drawdown_pct": ("Max drawdown (% do gross)", "{:.2f}%"),
         "hit_rate_pct": ("Hit rate diario", "{:.1f}%"),
-        "avg_gross": ("Gross medio (fracao do book)", "{:.3f}"),
-        "max_abs_net": ("Max |net| (fracao do book)", "{:.4f}"),
-        "ann_turnover_x": ("Turnover anualizado (x gross)", "{:.1f}x"),
+        "avg_gross": ("Gross medio (acoes, fracao do book)", "{:.3f}"),
+        "max_abs_net": ("Max |net| (acoes, fracao do book)", "{:.4f}"),
+        "avg_gross_com_hedge": ("Gross medio COM hedge", "{:.3f}"),
+        "max_abs_net_com_hedge": ("Max |net| COM hedge", "{:.4f}"),
+        "ann_turnover_x": ("Turnover anualizado (x gross, one-way)", "{:.1f}x"),
         "total_costs_usd_mm": ("Custos totais (USD mm)", "{:.1f}"),
         "costs_bps_of_gross_per_year": ("Custos (bps do gross/ano)", "{:.0f}"),
+        "cost_spread_bps_per_year": ("  - spread (bps/ano)", "{:.0f}"),
+        "cost_impact_bps_per_year": ("  - impacto de mercado (bps/ano)", "{:.0f}"),
+        "cost_borrow_bps_per_year": ("  - aluguel do short (bps/ano)", "{:.0f}"),
+        "cost_delist_bps_per_year": ("  - liquidacao por deslistagem (bps/ano)", "{:.0f}"),
+        "cost_hedge_bps_per_year": ("  - rebalance do hedge (bps/ano)", "{:.0f}"),
         "avg_n_positions": ("Numero medio de posicoes", "{:.0f}"),
         "max_abs_factor_expo": ("Max |exposicao a fator|", "{:.4f}"),
         "pnl_net_total_usd_mm": ("P&L liquido acumulado (USD mm)", "{:.1f}"),
     }
     for k, (label, f) in fmt.items():
-        lines.append(f"| {label} | {f.format(m[k])} |")
+        if k in m:                      # chaves opcionais (ex.: snapshot) podem faltar
+            lines.append(f"| {label} | {f.format(m[k])} |")
     (out / "metrics.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     _plots(res, out, gross_usd)

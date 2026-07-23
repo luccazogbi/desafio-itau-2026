@@ -5,8 +5,21 @@ Russell 2000 que SAIRAM do indice, quantos ainda tem preco no yfinance?
 Se a cobertura dos que sairam for baixa, o backtest small-cap gratuito
 continua com survival bias (justamente os que sumiram sao os que importam).
 
+!! ATENCAO -- ESTE SCRIPT NAO RODA COMO ESTA (verificado em 23/07/2026) !!
+
+    Ele carrega `data/raw/iwm_2019_split.pkl`, que classifica os membros do IWM em
+    "removidos" e "sobreviventes". **Nenhum script deste repositorio gera esse
+    arquivo** -- a etapa de baixar os holdings do IWM na SEC EDGAR foi feita
+    ad-hoc numa sessao anterior e nao foi versionada.
+
+    Consequencia: os numeros 18% vs 92% que embasam a escolha do universo
+    (considerações/) estao DOCUMENTADOS mas nao sao REPRODUZIVEIS a partir do
+    repositorio hoje. Para fechar essa lacuna e preciso implementar o passo 1
+    abaixo (download N-PORT) e gravar o pickle.
+
 Metodo:
   1. Holdings do IWM (iShares Russell 2000 ETF) via SEC EDGAR N-PORT, 2019 vs 2026.
+     >>> PASSO NAO IMPLEMENTADO NESTE ARQUIVO -- ver aviso acima <<<
   2. "Removidos" = no indice em 2019, fora em 2026 (mix de deslistados/adquiridos/
      graduados); "sobreviventes" = presentes nos dois -> grupo de controle.
   3. CUSIP -> ticker US via OpenFIGI (API gratuita, cobre deslistadas).

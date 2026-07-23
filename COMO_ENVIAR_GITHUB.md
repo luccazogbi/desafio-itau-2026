@@ -12,7 +12,7 @@ Abra o **PowerShell** e rode, linha por linha:
 
 ```powershell
 # 1. entrar na pasta do projeto
-cd "C:\Users\Lucca\Desktop\Quant\Desafio Quant\quant_ai_2026"
+cd "C:\Users\lucca\OneDrive\Área de Trabalho\Quant-main\Quant-main"
 
 # 2. ver o que mudou (opcional, mas bom hábito)
 git status
@@ -107,7 +107,7 @@ git log --oneline -10
 ## Colinha final (o combo completo em uma linha)
 
 ```powershell
-cd "C:\Users\Lucca\Desktop\Quant\Desafio Quant\quant_ai_2026"; git add -A; git commit -m "SUA MENSAGEM AQUI"; git push
+cd "C:\Users\lucca\OneDrive\Área de Trabalho\Quant-main\Quant-main"; git add -A; git commit -m "SUA MENSAGEM AQUI"; git push
 ```
 
 *Criado em 14/07/2026. Se a pasta do projeto mudar de lugar, só o `cd` da linha 1 muda — o resto é idêntico.*

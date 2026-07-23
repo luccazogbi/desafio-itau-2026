@@ -1,7 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "PowerShell($py = \"$env:USERPROFILE\\\\.venvs\\\\quant_ai_2026\\\\Scripts\\\\python.exe\"; & $py \"C:\\\\Users\\\\lucca\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-lucca-OneDrive--rea-de-Trabalho-Quant-main\\\\fccda282-5e90-4c0e-acf0-53d589cb1b56\\\\scratchpad\\\\proto_crosscheck.py\")"
-    ]
-  }
-}

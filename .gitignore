@@ -11,6 +11,11 @@ __pycache__/
 /data/
 /reports/
 
+# SNAPSHOTS: as COPIAS dos parquets ficam em data/snapshots/ (ja ignorado acima).
+# Os MANIFESTOS em /snapshots/*.json SAO versionados de proposito -- sao poucos KB
+# e sao eles que amarram cada numero do relatorio a um estado de dados
+# identificavel (hash SHA-256 de cada arquivo). Nao adicionar /snapshots/ aqui.
+
 # temporarios / OS
 *.log
 *.err

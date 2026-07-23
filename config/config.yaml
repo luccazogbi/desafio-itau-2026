@@ -9,13 +9,21 @@ paths:
   reports: reports                 # metricas, graficos, tearsheet
 
 data:
-  source: synthetic                # synthetic | bloomberg
+  source: synthetic                # synthetic | bloomberg  (rotulo da FONTE do painel)
+  panel: processed_sp500           # subpasta de data/ efetivamente usada nas rodadas
+                                   #   oficiais; 'processed' = painel sintetico.
+                                   #   Sobrescrevivel por --data no CLI.
   start: "2018-01-02"              # inicio do painel de dados
-  end: "2024-12-31"
+  end: "2024-12-31"                # ate onde o painel e BAIXADO (nao avaliado)
 
 backtest:
   start: "2020-01-02"              # inicio da simulacao (precisa de historico p/ betas)
-  end: "2024-12-31"
+  end: "2023-12-31"                # FIM DE DEV+VALIDACAO -- default deliberado.
+                                   #   Antes era 2024-12-31, o que fazia uma rodada sem
+                                   #   flags entrar no holdout por acidente.
+  holdout_start: "2024-01-01"      # daqui p/ frente e HOLDOUT: UMA unica ida, so com
+                                   #   --allow-holdout explicito. O motor recusa rodar
+                                   #   alem desta data sem a flag (guarda em engine.py).
 
 universe:
   min_price: 1.0                   # evita penny stocks
@@ -75,7 +83,14 @@ factors:
 
 risk:
   cov_window: 252                  # janela da covariancia de fatores
-  risk_aversion: 150.0             # lambda do termo de risco no otimizador
+  risk_aversion: 7.143             # lambda do termo de risco no otimizador.
+                                   # UNIDADE: variancia no HORIZONTE de manutencao
+                                   # (signal.horizon_days), a mesma unidade do alfa.
+                                   # Antes valia 150 contra a variancia de 1 DIA, o
+                                   # que subpenalizava risco em 21x sem que o numero
+                                   # revelasse isso. 150/21 = 7,143 resolve EXATAMENTE
+                                   # o mesmo problema: e correcao de unidade, nao
+                                   # recalibragem -- os resultados nao se movem.
   factor_exposure_bound: 0.02      # |beta do book| <= 2% do gross, por fator
   sector_net_bound: 0.05           # |net por setor| <= 5% do gross (residuo FF nao
                                    #   remove industria -- sem isso o book poderia
@@ -86,10 +101,29 @@ risk:
   participation_cap: 0.05          # |trade diario| <= 5% do ADV do nome
 
 costs:                             # modelo Almgren-Chriss (impacto de mercado)
-  spread_bps: 5.0                  # meio-spread + taxas, em bps do notional
-  ac_eta: 0.5                      # coef. impacto temporario (sqrt-law)
-  ac_gamma: 0.05                   # coef. impacto permanente (linear)
+  # CALIBRADO em 23/07 com ADV/vol reais do S&P 500 (scripts/14_cost_calibration.py).
+  # Dos 3 parametros, so o spread era estimavel com dado diario -- ver results/05.
+  spread_bps: 4.0                  # MEDIDO: Corwin-Schultz da 5,55 bps round-trip
+                                   #   (meio-spread 2,8) + ~1 bp de corretagem/taxas.
+                                   #   Era 5.0 por literatura -- conservador em ~25%.
+                                   #   Monotonico na liquidez: D1 8,1 -> D10 3,8 bps.
+  ac_eta: 0.5                      # coef. impacto temporario (sqrt-law).
+                                   #   NAO estimavel com preco diario (exige fills da
+                                   #   ordem-mae; Almgren 2005 usou base do Citi).
+                                   #   Mantido: implica 7,1 bps a 1% do ADV, dentro da
+                                   #   faixa publicada de 5-15 bps p/ large caps US.
+  ac_gamma: 0.05                   # coef. impacto permanente (linear).
+                                   #   NAO estimavel: a rota do Amihud DEGENERA --
+                                   #   ILLIQ x ADV ~ E|r|, entao gamma ~ E|r|/sigma
+                                   #   ~ 0,66 para qualquer acao (medido: identico em
+                                   #   todos os 10 decis de liquidez). Mantido.
   adv_window: 21                   # janela (dias) do ADV mediano
+  borrow_bps_per_year: 40.0        # ALUGUEL da perna short (general collateral em
+                                   #   large caps: 25-50 bps/ano). Debitado dia a dia
+                                   #   sobre |posicoes vendidas|. Era o unico custo
+                                   #   relevante que o modelo ignorava -- estava
+                                   #   documentado so no PIPELINE v1 arquivado.
+                                   #   0.0 reproduz o comportamento antigo.
 
 execution:
   lag_days: 1                      # sinal no close de t -> executa no close de t+1 (anti-lookahead)

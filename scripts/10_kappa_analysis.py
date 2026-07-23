@@ -34,6 +34,7 @@ from statarb.config import load_config, path_of
 from statarb.data.loaders import MarketData
 from statarb.data.universe import tradable_mask
 from statarb.factors.betas import FactorModel
+from statarb.stats import newey_west_tstat, overlap_lag
 
 J = 60        # janela de estimacao do AR(1) (dias) -- igual ao acumulo do sinal
 H = 21        # horizonte do IC (dias uteis a frente, apos execucao em t+1)
@@ -120,11 +121,16 @@ def main() -> None:
             if len(names) >= 40:
                 ic_q[q].append(spearmanr(z[names], fwd[names])[0])
 
+    # t-stat corrigido para SOBREPOSICAO: o IC olha H=21 dias a frente numa grade
+    # de EVERY=10 dias, entao medicoes vizinhas compartilham 11 dias. O t ingenuo
+    # assume independencia e infla. Mesma correcao aplicada nos scripts 04 e 12.
+    lag_ic = overlap_lag(H, EVERY)
+
     def stat(v):
         v = [x for x in v if np.isfinite(x)]
         if len(v) < 5:
             return np.nan, np.nan, 0
-        return float(np.mean(v)), float(np.mean(v) / np.std(v) * np.sqrt(len(v))), len(v)
+        return float(np.mean(v)), newey_west_tstat(v, lag_ic), len(v)
 
     ic_a, t_a, n_a = stat(ic_all)
     ic_f, t_f, _ = stat(ic_fast)

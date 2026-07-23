@@ -39,6 +39,7 @@ from statarb.data.loaders import MarketData
 from statarb.data.universe import tradable_mask
 from statarb.factors.betas import FactorModel
 from statarb.signals import _REGISTRY, build_signal
+from statarb.stats import newey_west_tstat, overlap_lag
 
 
 def evaluate_signal(name, cfg, md, fm, mask, splits) -> dict:
@@ -89,10 +90,6 @@ def evaluate_signal(name, cfg, md, fm, mask, splits) -> dict:
             if len(common) >= 30:
                 acs.append(np.corrcoef(za[common], zb[common])[0, 1])
 
-        def _t(v):
-            v = [x for x in v if np.isfinite(x)]
-            return float(np.mean(v) / np.std(v) * np.sqrt(len(v))) if len(v) > 3 else np.nan
-
         row = {
             "signal": name, "split": split_name,
             "n_dates": len(scores_hist),
@@ -103,7 +100,11 @@ def evaluate_signal(name, cfg, md, fm, mask, splits) -> dict:
         for h in horizons:
             v = [x for x in ics[h] if np.isfinite(x)]
             row[f"IC{h}"] = float(np.mean(v)) if v else np.nan
-            row[f"t{h}"] = _t(ics[h])
+            # t-stat corrigido para a SOBREPOSICAO das janelas: com horizonte h e
+            # grade de `every` dias, ICs vizinhos compartilham dias e o t ingenuo
+            # infla por ~raiz(h/every). Guardamos os dois para deixar o efeito visivel.
+            row[f"t{h}"] = newey_west_tstat(ics[h], overlap_lag(h, every))
+            row[f"t{h}_ing"] = newey_west_tstat(ics[h], 0)
         rows.append(row)
     return rows
 

@@ -108,30 +108,49 @@ data). Sem ela, o universo vira uma lista de vencedores por construção: as emp
 quebraram ou foram adquiridas somem da história — o **viés de sobrevivência**
 (*survivorship bias*) — e o resultado fica artificialmente inflado.
 
-Exemplo concreto: o **Silicon Valley Bank** estava no índice até quebrar em mar/2023.
-Com a lista de hoje ele nunca aparece no backtest; com a composição as-of, ele entra
-até 2023 e o colapso acontece — como aconteceria na vida real.
+Exemplo concreto: a **United Technologies** era uma das maiores industriais do índice até
+virar Raytheon (ticker `UTX` → `RTX`) em abr/2020. Com a lista de hoje, ou com um mapa de
+tickers incompleto, ela some do painel de 2018 a 2020 — e o backtest passa a operar um
+universo que nunca existiu.
 
 ### 1.2 Fontes (todas gratuitas e verificáveis)
 
 | Painel | Fonte |
 |---|---|
-| **Composição as-of** (2.712 datas de mudança, 1996→2026) | change log oficial da Wikipedia (dataset `fja05680/sp500`) |
-| **Preços/volume** ajustados | yfinance |
+| **Composição as-of** (2.718 datas de mudança, 1996→2026) | change log oficial da Wikipedia (dataset `fja05680/sp500`) |
+| **Preços/volume/máx-mín** ajustados | yfinance |
 | **Fatores FF5+Momentum** diários | biblioteca do Ken French |
 | **SPY** (hedge de beta) | yfinance |
 
 Tudo é gravado num **schema canônico** (parquets padronizados) — o pipeline lê qualquer
 fonte que escreva esse schema, sem alterar uma linha de código a jusante.
 
+A composição foi **auditada contra uma segunda fonte** (`scripts/13_membership_audit.py`):
+94,7% dos 320 eventos de entrada/saída batem com **data idêntica**. *Ressalva: o
+`fja05680` é derivado do change log da Wikipedia, então isso valida a derivação, não são
+fontes independentes — os press releases oficiais da S&P bloqueiam acesso automatizado.*
+
 ### 1.3 O viés residual, quantificado
 
-Membership as-of resolve o viés de **seleção**; resta o de **dados**: parte dos membros
-que saíram do índice não tem preço no yfinance. Medimos essa cobertura mês a mês
-(está no `meta.json`) — em vez de ignorar o viés, nós o **quantificamos**: entre os
-**removidos** do índice na janela, **46%** têm preço vs **99%** dos sobreviventes
-(`reports/delisted_coverage_sp500.md`). *(No Russell 2000 seria 18% vs 92% — foi por
-isso que a estratégia migrou para o S&P 500; ver `considerações/`.)*
+Membership as-of resolve o viés de **seleção**; resta o de **dados**: parte dos membros que
+saíram do índice não tem preço no yfinance. Cobertura média medida: **92,8%**.
+
+Duas honestidades que o número sozinho esconde:
+
+**(a) Parte do gap era bug nosso, não falta de dado.** A auditoria encontrou **26 trocas de
+ticker** (`UTX→RTX`, `MMC→MRSH`, `BK→BNY`, `ABC→COR`…) das quais o painel tratava só 3. Cada
+uma apagava a empresa inteira do período anterior à troca. Corrigido — a cobertura subiu de
+91,7% para 92,8%.
+
+**(b) O que sobra é real e CRESCE.** Quando uma empresa é adquirida, o yfinance apaga o
+histórico **inteiro** dela, inclusive os anos em que era constituinte saudável. Medido:
+**3,45%** dos meses-membro de 2020-2023 pertencem a empresas adquiridas *depois* de 2023
+(Hologic, Kellanova, Interpublic, Ansys, Hess, Juniper…). Cada nova aquisição apaga mais um
+nome do passado — o painel **não é estável entre execuções**, e a cobertura deve ser lida
+como medição *daquela data*.
+
+*(No Russell 2000 a cobertura das deslistadas seria 18% vs 92% — foi por isso que a
+estratégia migrou para o S&P 500; ver `considerações/`.)*
 
 #### ⚠️ Nota sobre o "gap" no início do gráfico 1.3a
 
@@ -581,7 +600,11 @@ liquidez_diaria = dados_mercado.adv.loc[data_exemplo].reindex(acoes)   # ADV em 
 acoes = [nome for nome, tem_adv in zip(acoes, liquidez_diaria.notna().values) if tem_adv]
 
 # 2) Insumos do otimizador (todos alinhados na mesma ordem de `acoes`)
-retorno_esperado = zscores.reindex(acoes).values * 5e-4 * 21   # 5 bps/z x horizonte 21d
+# alfa esperado: le do CONFIG (antes estava fixo em 5 bps/z, divergindo da
+# estrategia oficial, que usa signal.alpha_bps_per_z = 3)
+bps_por_z = float(config["signal"]["alpha_bps_per_z"]) * 1e-4
+horizonte = int(config["signal"]["horizon_days"])
+retorno_esperado = zscores.reindex(acoes).values * bps_por_z * horizonte
 matriz_betas = betas_data.reindex(acoes).values                # (n_acoes x 6 fatores)
 vol_idio = vol_idio_data.reindex(acoes).values                 # vol idiossincratica diaria
 chol_cov_fatores = factor_cov_chol(dados_mercado.factors, data_exemplo, 252)

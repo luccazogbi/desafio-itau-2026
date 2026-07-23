@@ -31,6 +31,7 @@ from statarb.data.loaders import MarketData
 from statarb.data.universe import tradable_mask
 from statarb.factors.betas import FactorModel
 from statarb.signals import build_signal
+from statarb.stats import newey_west_tstat, overlap_lag
 
 HORIZONTE_IC_DIAS = 21     # mesmo horizonte do sinal
 PASSO_GRADE_DIAS = 5       # grade de datas p/ o IC (evita sobreposicao excessiva)
@@ -105,9 +106,14 @@ def main() -> None:
                               "ic": spearmanr(zscores_hoje[acoes_validas],
                                               retorno_futuro[acoes_validas])[0]})
     ic_df = pd.DataFrame(ic_com_regime)
+    # t-stat corrigido para SOBREPOSICAO: o IC olha 21 dias a frente numa grade de
+    # 5 dias, entao medicoes vizinhas compartilham ~16 dias. O t ingenuo assume
+    # independencia e infla por ~raiz(21/5) ~ 2x. Reportamos os dois.
+    lag_ic = overlap_lag(HORIZONTE_IC_DIAS, PASSO_GRADE_DIAS)
     tabela_ic = ic_df.groupby("regime")["ic"].agg(
         ic_medio="mean",
-        t_stat=lambda v: v.mean() / v.std() * np.sqrt(len(v)),
+        t_ingenuo=lambda v: newey_west_tstat(v, 0),
+        t_newey_west=lambda v: newey_west_tstat(v, lag_ic),
         n_datas="count").round(4)
 
     # contexto anual: vol media de cada ano (explica 2020 vs 2023)

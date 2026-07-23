@@ -24,10 +24,16 @@ from statarb.factors.betas import FactorModel
 from statarb.signals import build_signal
 
 
-def _cli_overrides(cfg) -> str:
-    """Aplica overrides de CLI ao config; devolve o sufixo (tag) dos artefatos."""
+def _cli_overrides(cfg) -> tuple[str, bool]:
+    """Aplica overrides de CLI ao config.
+
+    Devolve (tag dos artefatos, permissao explicita de rodar no holdout).
+    """
     args = sys.argv[1:]
     tag = ""
+    allow_holdout = "--allow-holdout" in args
+    # o painel default (data.panel) ja e resolvido em load_config(); aqui so o
+    # override explicito de --data
     for i, a in enumerate(args):
         if a == "--signal":
             cfg["signal"]["name"] = args[i + 1]
@@ -35,6 +41,8 @@ def _cli_overrides(cfg) -> str:
             cfg["signal"]["alpha_bps_per_z"] = float(args[i + 1])
         elif a == "--horizon":
             cfg["signal"]["horizon_days"] = int(args[i + 1])
+        elif a == "--rebalance":   # dias uteis entre decisoes (default 3 no config)
+            cfg["execution"]["rebalance_every_days"] = int(args[i + 1])
         elif a == "--tag":
             tag = "_" + args[i + 1]
         elif a == "--data":       # ex.: --data processed_yf  (painel real do plano B)
@@ -43,18 +51,21 @@ def _cli_overrides(cfg) -> str:
             cfg["backtest"]["start"] = args[i + 1]
         elif a == "--bt-end":     # ex.: --bt-end 2023-12-31 (tranca o holdout)
             cfg["backtest"]["end"] = args[i + 1]
-    return tag
+    return tag, allow_holdout
 
 
 def main() -> None:
     t0 = time.time()
     cfg = load_config()
-    tag = _cli_overrides(cfg)
+    tag, allow_holdout = _cli_overrides(cfg)
+    if allow_holdout:
+        print("[!] --allow-holdout ATIVO: esta rodada PODE entrar no holdout (2024+).")
+        print("[!] O protocolo permite UMA unica ida. Registre a decisao no roadmap.")
 
     print("[1/4] Carregando painel de dados...")
     md = MarketData.from_dir(path_of(cfg, "data_processed"), cfg)
     print(f"      {md.returns.shape[1]} tickers x {md.returns.shape[0]} dias "
-          f"({cfg['data']['source']})")
+          f"| painel: {Path(cfg['paths']['data_processed']).name}")
 
     print("[2/4] Estimando modelo de fatores (betas rolling + residuos)...")
     fm = FactorModel(cfg).fit(md.returns, md.factors)
@@ -62,7 +73,7 @@ def main() -> None:
 
     print(f"[3/4] Backtest diario com sinal '{cfg['signal']['name']}'...")
     signal = build_signal(cfg)
-    engine = BacktestEngine(cfg)
+    engine = BacktestEngine(cfg, allow_holdout=allow_holdout)
     out = engine.run(md, fm, signal)
     res = out["results"]
     if out["n_opt_failures"]:
@@ -70,6 +81,18 @@ def main() -> None:
 
     print("[4/4] Metricas e tearsheet...")
     m = compute_metrics(res, float(cfg["book"]["gross_usd"]))
+
+    # RASTREABILIDADE: amarra este resultado ao estado exato dos dados. Sem isso,
+    # comparar duas rodadas nao distingue mudanca de codigo de mudanca de painel.
+    from statarb.snapshot import identifica_snapshot
+    snap = identifica_snapshot(path_of(cfg, "data_processed"),
+                               Path(cfg["_root"]) / "snapshots")
+    m["snapshot"] = snap or "NAO_RASTREAVEL"
+    if snap:
+        print(f"      painel = snapshot {snap}")
+    else:
+        print("      [warn] painel nao corresponde a nenhum snapshot: resultado NAO "
+              "rastreavel. Congele com scripts/16_snapshot_panel.py")
     rep = path_of(cfg, "reports")
     if tag:
         rep = rep / tag.lstrip("_")

@@ -46,8 +46,33 @@ DATASET = ("https://raw.githubusercontent.com/fja05680/sp500/master/"
            "S%26P%20500%20Historical%20Components%20%26%20Changes%20(Updated).csv")
 HEADERS = {"User-Agent": "Mozilla/5.0"}
 BATCH = 250
-# renomeacoes puras conhecidas (ticker antigo -> atual no yfinance); fusoes ficam de fora
-RENAMES = {"FB": "META", "ANTM": "ELV", "KORS": "CPRI"}
+
+# Renomeacoes de ticker (antigo -> atual no yfinance), resolvidas transitivamente
+# (ex.: CBS -> VIAC -> PARA -> PSKY colapsa em CBS -> PSKY).
+#
+# POR QUE ISSO IMPORTA: quando so o SIMBOLO muda, a empresa continua no indice --
+# mas o diff das listas de constituintes registra um par remove+add, e o ticker
+# antigo vira um "nome sem preco nenhum" no painel. Cada renomeacao nao tratada
+# apaga a empresa inteira do universo no periodo ANTERIOR a troca (ex.: sem o
+# UTX -> RTX, a United Technologies some do painel de 2018 a abr/2020).
+#
+# O mapa e derivado por `scripts/13_membership_audit.py`: pares (rem X, add Y) na
+# mesma data que aparecem no diff do fja05680 mas NAO no change log da Wikipedia
+# -- mudanca real de indice a Wikipedia registra; troca de ticker, nao.
+# Mantido explicito aqui (e nao baixado em runtime) para ser auditavel e estavel.
+#
+# RESSALVA: alguns pares combinam renomeacao com fusao (CBS/Viacom, Paramount/
+# Skydance). Tratamos como continuidade do constituinte porque e assim que a
+# Wikipedia -- e portanto a S&P -- os registra: sem evento de indice.
+RENAMES = {
+    "ABC": "COR",    "ANTM": "ELV",   "BBT": "TFC",    "BHGE": "BKR",
+    "BK": "BNY",     "BLL": "BALL",   "CBS": "PSKY",   "COG": "CTRA",
+    "CTL": "LUMN",   "FB": "META",    "FI": "FISV",    "HRS": "LHX",
+    "JEC": "J",      "KORS": "CPRI",  "LB": "BBWI",    "MMC": "MRSH",
+    "MYL": "VTRS",   "NLOK": "GEN",   "PARA": "PSKY",  "PEAK": "DOC",
+    "PKI": "RVTY",   "SATS": "ECHO",  "TMK": "GL",     "UTX": "RTX",
+    "VIAC": "PSKY",  "WRK": "SW",
+}
 
 
 def _arg(flag: str, default: str) -> str:

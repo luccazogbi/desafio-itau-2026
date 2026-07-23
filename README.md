@@ -28,34 +28,73 @@ $py = "$env:USERPROFILE\.venvs\quant_ai_2026\Scripts\python.exe"
 ## Fluxo de trabalho (dados reais, S&P 500 as-of)
 
 ```powershell
-# dados: composicao as-of + precos/volume/abertura + mcap/setor (uma vez)
+# dados: composicao as-of + precos/volume/abertura/max-min + mcap/setor (uma vez)
 & $py scripts\07_pull_sp500_asof.py
 & $py scripts\07b_add_marketcap_sp500.py
 & $py scripts\07c_add_open_sp500.py
+& $py scripts\07d_add_highlow_sp500.py
+
+# CONGELA o painel: sem isso, repuxar muda o universo historico e o backtest
+# deixa de ser reproduzivel entre execucoes (ver results/04)
+& $py scripts\16_snapshot_panel.py
+
+# auditoria do painel: cruza 2 fontes de membership e classifica o gap de precos
+& $py scripts\13_membership_audit.py
+
+# calibracao do modelo de custo com ADV/vol reais (spread por Corwin-Schultz)
+& $py scripts\14_cost_calibration.py
 
 # pesquisa de sinais: funil (IC/quintis, splits dev/val) e correlacoes p/ blend
-& $py scripts\04_signal_funnel.py resid_ou --data processed_sp500
-& $py scripts\09_blend_analysis.py --data processed_sp500
+& $py scripts\04_signal_funnel.py resid_ou
+& $py scripts\09_blend_analysis.py
 
-# BACKTEST OFICIAL (dev+val 2020-2023; holdout 2024+ trancado)
-& $py scripts\02_run_backtest.py --data processed_sp500 --bt-end 2023-12-31 --tag sp500_dev_val
+# BACKTEST OFICIAL (dev+val 2020-2023). O holdout e trancado PELO CONFIG:
+# backtest.end = 2023-12-31 e o motor RECUSA passar de holdout_start sem flag.
+& $py scripts\02_run_backtest.py --tag sp500_dev_val
 
 # notebook explicativo (gera + executa com graficos)
 & $py scripts\05_build_walkthrough.py
 
-# testes de sanidade (anti-lookahead de 9 sinais, neutralidades, custos)
+# testes de sanidade (20: anti-lookahead de 9 sinais, neutralidades, custos,
+#                     trava do holdout, aluguel do short, Newey-West,
+#                     Garleanu-Pedersen, snapshot)
 & $py -m pytest tests -q
 ```
+
+## Resultado atual (dev+val 2020-2023, holdout trancado)
+
+| | |
+|---|---:|
+| Sharpe bruto / líquido | **+0,51 / +0,16** |
+| Retorno líquido | +0,96% a.a. (sobre o gross) |
+| Custos | 211 bps/ano (impacto 60% · spread 30% · aluguel do short 9%) |
+| Turnover | 15,6× /ano (one-way) |
+| Max drawdown | −11,3% |
+| Snapshot do painel | `2026-07-23` |
+
+Diagnóstico completo em [`results/01`](results/01_analise_backtest_dev_val.md). A curva de
+capacidade ([`results/02`](results/02_analise_capacidade.md)) mostra **0,33 em $100mm** —
+o mandato de $1 bi opera acima do tamanho ótimo da estratégia.
 
 ## Estrutura
 
 ```
 config/config.yaml    <- TODOS os parametros (sinal ativo, mandato, custos, splits)
 statarb/              <- pacote: data, factors, signals (11 plug-ins), risk, costs,
-                         portfolio (otimizador), backtest (motor proprio)
+                         portfolio (otimizador), backtest (motor proprio), stats
 scripts/              <- 00 sintetico | 02 backtest | 04 funil | 05 notebook
                          07x painel S&P500 as-of | 08 estudo deslistadas | 09 blend
+                         10 kappa | 11 capacidade | 12 regime | 13 auditoria as-of
+                         14 calibracao de custos | 15 Garleanu-Pedersen
+                         16 snapshot do painel
+                         legados: 01 Bloomberg (aguarda acesso) | 03 crosscheck bt
+                                  06 proxy R2000 (substituido pelo 07)
+snapshots/            <- manifestos (hash SHA-256 de cada parquet) -- VERSIONADOS.
+                         As copias dos dados ficam em data/snapshots/ (fora do git)
 notebooks/            <- pipeline_walkthrough.ipynb (documento vivo) + doubts.md
+results/              <- analises interpretadas (01 backtest | 02 capacidade
+                         03 regime | 04 auditoria de membership | 05 custos
+                         06 multi-periodo GP vs heuristica | 07 elevar o Sharpe)
 docs/                 <- genai_log.md | arquivo/ (documentos historicos)
 considerações/        <- justificativas metodologicas (universo, vieses)
 data/ reports/        <- gerados pelos scripts (fora do git)
@@ -63,9 +102,24 @@ data/ reports/        <- gerados pelos scripts (fora do git)
 
 ## Decisões-chave (não reabrir sem motivo novo)
 
-1. **Universo S&P 500 as-of** — R2000 gratuito tem survival bias severo (medido:
-   18% de cobertura das deslistadas vs 92%); ver `considerações/`.
-2. **Sinal único `resid_ou`** — funil de 11 candidatos: é o único com IC robusto
-   nos dois splits; blend testado 2× e descartado (não agrega).
+1. **Universo S&P 500 as-of** — R2000 gratuito tem survival bias muito mais severo: das
+   ações **removidas** do índice, só **18%** têm preço no R2000 contra **46%** no S&P 500;
+   ver `considerações/`.
+2. **Sinal único `resid_ou`** — funil de 11 candidatos: é o melhor, com IC positivo e
+   consistente nos dois splits (IC21 0,051 dev / 0,036 val). Com t-stat corrigido por
+   Newey-West: **t = 2,50 dev / 1,66 val** — o dev é significativo, a validação não
+   chega a 2. Blend testado 2× e descartado (não agrega).
 3. **Sem Bloomberg** até etapas futuras do desafio — fontes: Wikipedia/fja05680
    (membership), yfinance (preços), Ken French (fatores), Nasdaq screener (mcap/setor).
+
+## Limitações conhecidas (medidas, não escondidas)
+
+| Limitação | Tamanho | Onde está documentada |
+|---|---|---|
+| Deslistadas sem preço no yfinance | **6,8%** dos meses-membro | `results/04` |
+| Universo de 2020-23 erodido por M&A de 2024-26 | **3,5%** e **crescendo** | `results/04` |
+| Reprodutibilidade entre execuções | resolvida por **snapshot** (`scripts/16`) | `results/04` §6 |
+| Setor e market cap vêm do screener de **hoje** | look-ahead brando | `scripts/07b` |
+| Deslistagem sem perda terminal | otimista na perna long | docstring de `engine.py` |
+| Validação independente da composição | **em aberto** (S&P bloqueia acesso) | `results/04` |
+| Números 18%/46% do estudo de deslistadas | **não re-deriváveis** hoje (`scripts/08` depende de um pickle que nenhum script gera) | `considerações/` |
