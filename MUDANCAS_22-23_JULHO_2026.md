@@ -277,15 +277,22 @@ não-identificáveis, não assumidos:
 Forma fechada **derivada** (resolvendo o Bellman e casando coeficientes) e **validada por
 simulação** — a política GP domina todas as perturbações dela.
 
-**Achado colateral valioso:** a autocorrelação do z-score decai de 0,842 (5d) a 0,243 (40d)
-→ **meia-vida de 21,7 dias úteis**. O `horizon_days = 21` foi escolhido *a priori*, sem olhar
-dado. **Validação independente.**
+> 🔴 **CORRIGIDO EM 24/07.** Esta seção foi escrita com números do painel **sintético** —
+> o `scripts/15` ficou de fora da correção de `data.panel` da §3.6 e não foi re-executado.
+> Os valores abaixo já são os do painel real. Ver `results/06` §6.
 
-**Veredito:** a heurística **reage ~4× demais** ao sinal (`H` ótimo ≈ 5,5, não 21) e
-**rebalanceia devagar demais** (2% do gap por período vs 13% do ótimo). Os dois erros se
+**Achado colateral:** a autocorrelação do z-score decai de 0,886 (5d) a 0,231 (40d)
+→ **meia-vida de 21,4 dias úteis**, próxima do `horizon_days = 21` escolhido a priori.
+**Não é validação independente**, como se afirmou antes: a autocorrelação de uma soma móvel
+de 60 dias decai mecanicamente, e ruído branco puro pelo mesmo acumulador dá "meia-vida" de
+28,6d. Os dois números descendem da mesma escolha de desenho (`accum_days = 60`).
+
+**Veredito:** a heurística **reage ~6× demais** ao sinal (`H` ótimo ≈ 3,7, não 21) e
+**rebalanceia devagar demais** (4,9% do gap por período vs 20% do ótimo). Os dois erros se
 cancelam em parte — compensação acidental, frágil.
 
-*Ressalva:* GP supõem custo quadrático; o nosso tem spread linear (11%) e potência 3/2. É
+*Ressalva, agora central:* GP supõem custo quadrático; no painel real o **spread é 45% do
+custo** (não 11%) — e é exatamente o componente linear que o GP não representa. É
 diagnóstico, não substituição. `horizon_days` **não foi alterado**.
 
 ### 6.3 Filtro de κ (Avellaneda-Lee) — **rejeitado** — `results/07`
@@ -298,9 +305,14 @@ pela primeira vez:
 | Q1 (mais **lento**) | **+0,050** |
 | Q4 (mais **rápido**) | +0,024 |
 
-Só **4%** do universo não reverte, e o IC é **maior nas de reversão lenta**. Filtrar
-derrubaria o IC em 25%. Coerente: o sinal acumula 60 dias e tem meia-vida de 21,7 — é feito
-para reversão lenta.
+O IC é **maior nas de reversão lenta**; filtrar derrubaria o IC em 25%. Coerente: o sinal
+acumula 60 dias e é feito para reversão lenta.
+
+> 🟠 **Corrigido em 24/07.** O argumento auxiliar *"só 4% do universo não reverte"* **não
+> vale**: ruído iid puro também passa no teste `b<1` em 95% dos casos (viés Dickey-Fuller
+> em T=59), e o critério real do A&L (`tau < J/2`) descarta **19%**, não 4%. Também
+> corrigido o rótulo — `tau = 12d` é a constante de tempo; a meia-vida é 8d. O veredito
+> não muda: vem do ordenamento por quartil, não do corte binário.
 
 ### 6.4 Reduzir giro — funciona, mas menos do que parecia — `results/07`
 
@@ -400,7 +412,20 @@ A **forma** monotônica — que é a conclusão — não mudou.
 2. **Comparação R2000 × S&P 500 estava trocada** — "18% vs 92%" comparava deslistadas do
    R2000 com **sobreviventes do R2000**. O correto entre deslistadas é **18% (R2000) vs
    46% (S&P 500)**.
-3. **Dois números-chave não são reproduzíveis** ⚠️ — `scripts/08` carrega
+3. **Auditoria de 24/07 — o que esta rodada deixou passar.** Registrado aqui porque é o
+   padrão que se repete: um artefato gerado do painel errado, uma alegação circular e um
+   número sem poder estatístico sobreviveram à revisão de 23/07.
+
+   | Achado | Onde | Efeito |
+   |---|---|---|
+   | `results/06` gerado no painel **sintético** | `scripts/15` não re-rodado após a §3.6 | λ 6,9→**1,0**, `H` 5,5→**3,7**, spread 11%→**45%** |
+   | "meia-vida valida `horizon_days`" era **circular** | `results/06` §2 | alegação rebaixada; controle de ruído branco adicionado |
+   | "só 4% não revertem" **não tem poder** | `results/07` §1 | ruído iid dá 5%; critério real do A&L dá 19% |
+   | Notebook uma versão **atrás** do gerador | 92,9% vs 92,8%; "14 testes" | regenerado; gerador corrigido p/ 20 |
+   | "18% vs 92%" ainda circulando | roadmap, considerações, notebook | corrigido p/ **18% vs 46%** (mesmo denominador) |
+   | Deslistamento **nunca ocorre** no backtest | custo 0,0 bps era caminho morto | novo `results/08` + `scripts/17` |
+
+4. **Dois números-chave não são reproduzíveis** ⚠️ — `scripts/08` carrega
    `data/raw/iwm_2019_split.pkl`, que **nenhum script gera**; e
    `reports/delisted_coverage_sp500.md` é citado mas nada o produz. São justamente os números
    que justificam a escolha do universo. Ficam marcados como **medição de 14/07, não

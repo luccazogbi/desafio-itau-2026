@@ -14,9 +14,21 @@ empiricamente**: sem acesso a bases pagas (Bloomberg/CRSP), é impossível recon
 Russell 2000 histórico sem um **viés de sobrevivência severo**, porque os preços das
 ações que saíram do índice simplesmente não existem nas fontes gratuitas.
 
-O número que fundamenta a decisão: das ações do Russell 2000 que **deixaram** o índice
-entre 2019 e 2026, apenas **18%** têm histórico de preço recuperável gratuitamente,
-contra **92%** das que permaneceram.
+O número que fundamenta a decisão: entre as ações **removidas** de cada índice — que são
+justamente as que o viés de sobrevivência apaga — apenas **18%** têm preço recuperável
+gratuitamente no **Russell 2000**, contra **46%** no **S&P 500**.
+
+> ⚠️ **Cuidado com a comparação errada.** É comum citar "18% vs 92%" como se fosse o
+> contraste entre os dois índices. **Não é**: os 92% são a cobertura dos **sobreviventes do
+> próprio R2000** (grupo de controle interno, §5), e o par correspondente no S&P 500 é 99%.
+> A comparação que decide a escolha do universo tem de usar o **mesmo denominador nos dois
+> índices** — removidos contra removidos: **18% (R2000) vs 46% (S&P 500)**.
+
+| Comparação | R2000 | S&P 500 | Serve para |
+|---|---:|---:|---|
+| Cobertura das **removidas** | **18%** | **46%** | ✅ escolher o universo |
+| Cobertura das **sobreviventes** | 92% | 99% | grupo de controle |
+| Gap (sobreviventes − removidas) | 74 pp | 53 pp | tamanho do viés dentro de cada índice |
 
 ---
 
@@ -81,15 +93,42 @@ dados gratuitos?**
 **Rotatividade do índice:** dos 1.924 membros do Russell 2000 em nov/2019,
 **910 (47%) saíram** até jul/2026 — quase metade.
 
+### 5.1 Russell 2000
+
 | Grupo | Nº de nomes | Cobertura de preço (yfinance) |
 |---|---:|---:|
 | Sobreviventes (ainda no índice) | 300 (amostra) | **92%** |
 | Removidos (saíram / deslistaram) | 910 | **18%** |
 | **Gap de cobertura (viés residual)** | | **74 pontos percentuais** |
 
-Para comparação, o mesmo procedimento aplicado ao **S&P 500 as-of** resulta em
-**92,8%** de cobertura média dos membros históricos — porque large caps que saem do
-índice geralmente o fazem por **aquisição**, e não por falência.
+### 5.2 S&P 500 — o mesmo procedimento, o mesmo denominador
+
+Medido em 14/07 na janela 2018–2026 (rotatividade da janela: 26%):
+
+| Grupo | Nº de nomes | Cobertura de preço (yfinance) |
+|---|---:|---:|
+| Sobreviventes (503) | 503 | **99%** |
+| **Removidos do índice** | **181** | **46%** |
+| **Gap de cobertura** | | **53 pontos percentuais** |
+
+**É a linha "removidos" que decide o universo: 18% no R2000 contra 46% no S&P 500.**
+O viés existe nos dois; é ~2,5× mais severo no small cap.
+
+> ⚠️ **Reprodutibilidade (verificada em 23/07/2026).** O relatório
+> `reports/delisted_coverage_sp500.md`, de onde vêm os 46%/99%, **não é gerado por nenhum
+> script deste repositório** — veio de execução ad-hoc não versionada, como os 18%/92% do
+> R2000 (§4). Ambos devem ser apresentados como **medição de 14/07**, não como resultado
+> reproduzível.
+>
+> Métrica equivalente e **reprodutível hoje**: `scripts/13_membership_audit.py` mede 77 dos
+> 665 membros as-of do S&P 500 sem nenhum preço (gap de 6,76% em meses-membro), e
+> `scripts/17_delisting_audit.py` mostra que **36 das 68 empresas que saíram do índice em
+> 2020-2023 não têm um único dia de preço** — a mesma conclusão qualitativa, com código
+> versionado.
+
+Separadamente, a cobertura média dos **membros as-of** do painel S&P 500 adotado é
+**92,8%** — outra métrica (média mensal sobre todos os membros, não sobre os removidos),
+citada aqui só para não ser confundida com as linhas acima.
 
 > **Atualização de 22/07.** Este número era **91,7%** até a auditoria de composição
 > (`scripts/13_membership_audit.py`) revelar que **20% do gap não era falta de dado,
@@ -123,11 +162,11 @@ Para comparação, o mesmo procedimento aplicado ao **S&P 500 as-of** resulta em
 
 ## 7. Conclusão e trade-off assumido
 
-**Para o desafio, o universo é o S&P 500 as-of** (cobertura de 92%, viés residual
-pequeno e quantificado). A decisão troca **potência de alfa por integridade de dados**:
-em large caps a reversão de curto prazo é mais fraca (a literatura a localiza em small
-caps), mas um backtest honesto num universo com dados confiáveis vale mais, para a
-avaliação, do que um resultado "bonito" sobre dados enviesados.
+**Para o desafio, o universo é o S&P 500 as-of** (cobertura de **92,8%** dos membros as-of;
+viés residual **menor**, quantificado — não eliminado). A decisão troca **potência de alfa
+por integridade de dados**: em large caps a reversão de curto prazo é mais fraca (a
+literatura a localiza em small caps), mas um backtest honesto num universo com dados
+confiáveis vale mais, para a avaliação, do que um resultado "bonito" sobre dados enviesados.
 
 **Caminhos para o Russell 2000 no futuro** (fora do escopo gratuito atual):
 
@@ -142,9 +181,16 @@ avaliação, do que um resultado "bonito" sobre dados enviesados.
 ## 8. Nota metodológica
 
 Esta análise é, ela própria, uma **contribuição de rigor** — quantificar o viés de
-sobrevivência com um número concreto (18% vs 92%) atende diretamente ao critério de
-*backtest e mitigação de vieses* da avaliação. O método (IWM/EDGAR N-PORT + OpenFIGI +
-yfinance) é reprodutível e reaproveitável.
+sobrevivência com um número concreto (**18% vs 46%** entre as removidas dos dois índices)
+atende diretamente ao critério de *backtest e mitigação de vieses* da avaliação. O método
+(IWM/EDGAR N-PORT + OpenFIGI + yfinance) é reaproveitável, mas **o passo de download não foi
+versionado** — fechar essa lacuna (§4) é item aberto do roadmap.
+
+**O que este documento NÃO conclui.** Escolher o S&P 500 reduz o viés; não o elimina.
+`results/08` mostra que, mesmo no universo adotado, o backtest processa **zero**
+deslistamentos: as empresas com desfecho ruim não saem do painel no meio, elas nunca entram.
+O viés de **seleção de membros** está resolvido pela composição as-of; o de **desfecho**
+permanece, e é intransponível com dados gratuitos.
 
 **Artefatos de suporte:**
 - `scripts/08_delisted_coverage.py` — código da medição

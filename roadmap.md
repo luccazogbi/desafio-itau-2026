@@ -59,7 +59,11 @@ beta com **SPY**. Sinal oficial: **`resid_ou`** (reversão de resíduo, Avellane
 - [x] Market cap (proxy) — `scripts/07b_add_marketcap_sp500.py`
 - [x] **Cobertura medida = 92,8%** dos membros as-of (era 91,7% antes da correção de
       renomeações; viés residual quantificado no `meta.json` e em `results/04`)
-- [x] **Estudo que justifica S&P 500 vs R2000** — `scripts/08_delisted_coverage.py` (18% vs 92%)
+- [x] **Estudo que justifica S&P 500 vs R2000** — `scripts/08_delisted_coverage.py`:
+      entre as **removidas** de cada índice, **18% (R2000) vs 46% (S&P 500)** têm preço.
+      (Os 92%/99% são a cobertura dos **sobreviventes** de cada índice — outro denominador.)
+      ⚠️ Medição de 14/07, **não re-derivável** hoje (o script depende de um pickle que
+      nenhum script gera). Equivalente reprodutível: `scripts/13` e `scripts/17`.
 - [x] **Auditoria da composição as-of (22/07)** — `scripts/13_membership_audit.py`,
       interpretação em [`results/04`](results/04_auditoria_membership_e_cobertura.md):
   - Cross-check de 2 logs de eventos: **94,7% de concordância exata de data** ✓
@@ -81,8 +85,20 @@ beta com **SPY**. Sinal oficial: **`resid_ou`** (reversão de resíduo, Avellane
     nenhum snapshot conhecido (resultado não rastreável)
   - `--diff A B` mede a **erosão entre versões** em meses-membro
   - Snapshot inicial: **`2026-07-23`** — 665 tickers, 77 sem preço, gap de 7,04% em dev+val
+- [x] **Auditoria do deslistamento (24/07)** — `scripts/17_delisting_audit.py`,
+      interpretação em [`results/08`](results/08_deslistamento_ausente_no_backtest.md):
+      das **68 empresas que saíram do índice em 2020-2023**, **36 não têm preço algum**, e o
+      motor processou **ZERO** liquidações por deslistagem em 1.006 dias. A linha de custo
+      "liquidação por deslistagem = 0,0 bps" não é custo desprezível — é caminho de código
+      nunca executado. Consequência: a composição as-of resolve o viés de **seleção de
+      membros**; o de **seleção de desfechos** permanece inteiro e não é corrigível no
+      gratuito. A limitação "deslistagem sem perda terminal" estava listada como endereçada
+      e é, na prática, **vazia**.
 - [ ] Validação **independente** da composição (S&P Global bloqueia acesso automatizado,
       HTTP 403) — rota possível: holdings do IVV via SEC EDGAR N-PORT
+- [ ] (proposto, `results/08` §4) impor **desfecho explícito** na data de saída do índice
+      (falência = −100%, M&A = prêmio), usando o motivo já baixado pelo `scripts/13` —
+      troca uma premissa silenciosa por uma declarada
 - [ ] (opcional) Ampliar janela para 2010+ se o relatório pedir histórico mais longo
 
 
@@ -161,9 +177,13 @@ beta com **SPY**. Sinal oficial: **`resid_ou`** (reversão de resíduo, Avellane
 - [x] **Tentativas de elevar o Sharpe honestamente** (23/07, interpretação em
       [`results/07`](results/07_tentativas_de_elevar_o_sharpe.md)):
   - **Filtro de κ (Avellaneda-Lee) — REJEITADO pela evidência.** `scripts/10` rodado pela
-    1ª vez: só **4%** do universo não reverte, e o IC é **maior** nas de reversão LENTA
-    (Q1 0,050 → Q4 0,024). Filtrar derrubaria o IC em 25%. Coerente com o sinal acumular
-    60d e ter meia-vida de 21,7d — ele é feito para reversão lenta.
+    1ª vez: o IC é **maior** nas de reversão LENTA (Q1 0,050 → Q4 0,024); filtrar
+    derrubaria o IC em 25%. Coerente com o sinal acumular 60d — ele é feito para reversão
+    lenta. **Corrigido em 24/07:** o argumento auxiliar *"só 4% do universo não reverte"*
+    **não vale** — ruído iid puro também "passa" no teste `b<1` em 95% dos casos (viés
+    Dickey-Fuller em T=59), e o critério real do A&L (`tau < J/2`) descarta 19%, não 4%.
+    Também corrigido o rótulo `tau` = constante de tempo (12d), meia-vida = 8d. O veredito
+    não muda: vem do ordenamento por quartil, não do corte binário.
   - **Reduzir giro — funciona, mas menos do que parecia.** A leitura ingênua sugeria
     rebalance 10d dando +0,11 de Sharpe. **Teste de fase desmontou:** fixando 10 dias e
     deslocando só a data inicial, o Sharpe líquido varia de **0,077 a 0,341** — dispersão
@@ -200,21 +220,27 @@ beta com **SPY**. Sinal oficial: **`resid_ou`** (reversão de resíduo, Avellane
 - [x] **Otimização multi-período (Gârleanu-Pedersen) vs. horizonte heurístico** (23/07,
       `scripts/15` + `statarb/portfolio/garleanu_pedersen.py`, interpretação em
       [`results/06`](results/06_gp_multiperiodo_vs_heuristica.md)):
+      **⚠️ Números corrigidos em 24/07:** a primeira execução rodou sobre o painel
+      **sintético** (o `scripts/15` ficou de fora da correção de `data.panel` de 22/07 e
+      não foi re-rodado). Detectado por inconsistência de ADV entre `results/05` e `06`.
   - Forma fechada **derivada** no módulo (não citada) e **validada por simulação** — a
     política GP domina todas as perturbações dela.
-  - **`φ` medido no painel**: autocorrelação do z-score decai de 0,842 (5d) a 0,243 (40d)
-    → **meia-vida de 21,7 dias úteis**. Isso **valida independentemente** o
-    `horizon_days = 21`, que fora escolhido a priori sem olhar dado.
-  - **Veredito:** a heurística **reage ~4× demais ao sinal** (`H` ótimo ≈ 5,5, não 21) e
-    **rebalanceia devagar demais** (fecha 2% do gap por período contra 13% do ótimo).
+  - **`φ` medido no painel**: autocorrelação do z-score decai de 0,886 (5d) a 0,231 (40d)
+    → **meia-vida de 21,4 dias úteis**. É **consistente com** o `horizon_days = 21`, mas
+    **não é validação independente**: a autocorrelação de uma soma móvel de 60 dias decai
+    mecanicamente, e ruído branco puro pelo mesmo acumulador dá "meia-vida" de 28,6d. Os
+    dois números descendem da mesma escolha de desenho (`accum_days = 60`).
+  - **Veredito:** a heurística **reage ~6× demais ao sinal** (`H` ótimo ≈ 3,7, não 21) e
+    **rebalanceia devagar demais** (fecha 4,9% do gap por período contra 20% do ótimo).
     Os dois erros **se cancelam em parte** — compensação acidental, frágil a mudanças de
     sinal, custo ou tamanho de book.
-  - **Ressalvas declaradas:** GP supõem custo quadrático (o nosso tem spread linear = 11%
-    e potência 3/2), e o confronto é sem restrições, enquanto o pipeline real opera na
-    restrição de gross. Diagnóstico, não substituição.
+  - **Ressalva que ficou CENTRAL com os números reais:** o **spread é 45% do custo** no
+    trade típico (não 11%, como saiu do painel sintético) — e é justamente o componente
+    **linear** que o GP, com custo quadrático, não representa. Custo linear gera banda de
+    não-negociação; quadrático gera ajuste suave. O mapeamento GP → nossa mesa é frouxo.
   - `horizon_days` **NÃO foi alterado** — mudá-lo move o backtest e deve ser decisão
-    consciente. Evolução proposta: taxa de trade do GP como banda de não-negociação
-    dentro do otimizador convexo (mantém o mandato).
+    consciente. Evolução proposta: **banda de não-negociação** dentro do otimizador convexo
+    (representa o spread com a curvatura certa e mantém o mandato).
 
 ## 6. GenAI (15% da nota) — contínuo
 

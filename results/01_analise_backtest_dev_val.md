@@ -75,6 +75,11 @@ correto.
 O aluguel do short é o item que **não existia** antes de 22/07 — estava documentado apenas
 no `PIPELINE v1` arquivado e havia sumido na reescrita dos docs.
 
+> **O zero da penúltima linha não é "custo desprezível" — é evento que nunca ocorre.** Em
+> 1.006 dias o motor processou **zero** liquidações por deslistagem: as empresas adquiridas
+> não saem do painel no meio do backtest, elas nunca entram (o yfinance apaga o histórico
+> inteiro). Auditado em [`results/08`](08_deslistamento_ausente_no_backtest.md).
+
 ---
 
 ## 3. Neutralidade: o livro real vs. o livro reportado
@@ -154,16 +159,20 @@ decaimento, é regime** — em vol baixa o IC é estatisticamente zero.
 - **Calibração:** `alpha_bps_per_z` = 3 e rebalance a cada 3 dias foram calibrados *a priori*,
   sem grid search. `spread_bps` foi **medido** (Corwin-Schultz, `results/05`); `eta` e `gamma`
   foram **demonstrados não-estimáveis** com dado diário e mantidos da literatura.
-- **`horizon_days` = 21** foi validado independentemente: a meia-vida medida do sinal é
-  **21,7 dias úteis** (`results/06`). O mesmo estudo mostra que a heurística **reage ~4×
-  demais** ao sinal frente ao ótimo de Gârleanu-Pedersen — fragilidade conhecida, não corrigida
-  (mudá-la move o backtest e exige decisão consciente).
+- **`horizon_days` = 21** é *consistente com* — mas **não validado por** — a meia-vida medida
+  do sinal, de **21,4 dias úteis** (`results/06`). A medição não é independente: a
+  autocorrelação é dominada pela janela de acumulação de 60 dias do próprio sinal, também
+  escolhida a priori. O mesmo estudo mostra que a heurística **reage ~6× demais** ao sinal
+  frente ao ótimo de Gârleanu-Pedersen (`H` implícito 3,7 vs 21) — fragilidade conhecida, não
+  corrigida (mudá-la move o backtest e exige decisão consciente).
 - **Artefato conhecido:** `max_abs_factor_expo` = 0,593 é distorção de **medição** na COVID —
   as exposições diárias usam betas re-estimados mensalmente, e em mar–abr/2020 eles mudaram
   bruscamente. A *restrição* não foi violada (ela é imposta na data da decisão); a *exposição
   realizada* foi. No dia a dia \|expo_mkt\| ≈ 0,015.
 - **Viés de dados:** 6,8% dos meses-membro sem preço, com **3,45% de erosão retroativa** que
-  **cresce** a cada aquisição (`results/04`).
+  **cresce** a cada aquisição (`results/04`). O viés de **seleção de membros** está resolvido
+  pela composição as-of; o de **desfecho** não — das 68 empresas que saíram do índice em
+  2020-2023, 36 não têm preço algum (`results/08`).
 
 > **Para o relatório:** um Sharpe de 0,16 **bem diagnosticado** — com capacidade, regime,
 > custos decompostos e vieses medidos — demonstra mais maturidade que um Sharpe alto inflado

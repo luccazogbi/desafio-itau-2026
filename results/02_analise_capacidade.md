@@ -44,9 +44,11 @@ até **aumenta** em books pequenos (15,6× → 20,8×), porque os caps de liquid
 Implicação: em books pequenos, a alavanca de melhoria não é mais reduzir impacto — é
 **reduzir giro** (rebalanceamento mais espaçado, bandas de no-trade).
 
-> `results/06` dá o mecanismo por trás disso: a heurística do `horizon_days` **reage ~4×
-> demais ao sinal** frente ao ótimo multi-período de Gârleanu-Pedersen. A banda de
-> não-negociação sugerida ali é a implementação natural desta recomendação.
+> `results/06` dá o mecanismo por trás disso: a heurística do `horizon_days` **reage ~6×
+> demais ao sinal** frente ao ótimo multi-período de Gârleanu-Pedersen (`H` implícito 3,7
+> vs 21). E como o spread responde por **45%** do custo no trade típico, a implementação
+> teoricamente correta não é mexer no `horizon_days` — é uma **banda de não-negociação**,
+> que é a política que custo linear gera. É a implementação natural desta recomendação.
 
 ## 3. Conexão com a análise de regime
 

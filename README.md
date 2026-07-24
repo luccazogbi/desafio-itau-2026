@@ -41,6 +41,9 @@ $py = "$env:USERPROFILE\.venvs\quant_ai_2026\Scripts\python.exe"
 # auditoria do painel: cruza 2 fontes de membership e classifica o gap de precos
 & $py scripts\13_membership_audit.py
 
+# auditoria do deslistamento: o backtest chega a viver algum? (roda apos o 02)
+& $py scripts\17_delisting_audit.py
+
 # calibracao do modelo de custo com ADV/vol reais (spread por Corwin-Schultz)
 & $py scripts\14_cost_calibration.py
 
@@ -86,7 +89,7 @@ scripts/              <- 00 sintetico | 02 backtest | 04 funil | 05 notebook
                          07x painel S&P500 as-of | 08 estudo deslistadas | 09 blend
                          10 kappa | 11 capacidade | 12 regime | 13 auditoria as-of
                          14 calibracao de custos | 15 Garleanu-Pedersen
-                         16 snapshot do painel
+                         16 snapshot do painel | 17 auditoria de deslistamento
                          legados: 01 Bloomberg (aguarda acesso) | 03 crosscheck bt
                                   06 proxy R2000 (substituido pelo 07)
 snapshots/            <- manifestos (hash SHA-256 de cada parquet) -- VERSIONADOS.
@@ -94,7 +97,8 @@ snapshots/            <- manifestos (hash SHA-256 de cada parquet) -- VERSIONADO
 notebooks/            <- pipeline_walkthrough.ipynb (documento vivo) + doubts.md
 results/              <- analises interpretadas (01 backtest | 02 capacidade
                          03 regime | 04 auditoria de membership | 05 custos
-                         06 multi-periodo GP vs heuristica | 07 elevar o Sharpe)
+                         06 multi-periodo GP vs heuristica | 07 elevar o Sharpe
+                         08 deslistamento ausente no backtest)
 docs/                 <- genai_log.md | arquivo/ (documentos historicos)
 considerações/        <- justificativas metodologicas (universo, vieses)
 data/ reports/        <- gerados pelos scripts (fora do git)
@@ -118,8 +122,10 @@ data/ reports/        <- gerados pelos scripts (fora do git)
 |---|---|---|
 | Deslistadas sem preço no yfinance | **6,8%** dos meses-membro | `results/04` |
 | Universo de 2020-23 erodido por M&A de 2024-26 | **3,5%** e **crescendo** | `results/04` |
+| **Viés de DESFECHO** — o backtest processa **zero** deslistamentos; 36 das 68 saídas do índice em 2020-23 não têm preço algum | **não corrigível** no gratuito | **`results/08`** |
 | Reprodutibilidade entre execuções | resolvida por **snapshot** (`scripts/16`) | `results/04` §6 |
 | Setor e market cap vêm do screener de **hoje** | look-ahead brando | `scripts/07b` |
-| Deslistagem sem perda terminal | otimista na perna long | docstring de `engine.py` |
+| Deslistagem sem perda terminal | limitação **vazia**: o caminho nunca é executado | `results/08` |
 | Validação independente da composição | **em aberto** (S&P bloqueia acesso) | `results/04` |
 | Números 18%/46% do estudo de deslistadas | **não re-deriváveis** hoje (`scripts/08` depende de um pickle que nenhum script gera) | `considerações/` |
+| `horizon_days = 21` não é validado pela meia-vida medida | a medição não é independente (janela de 60d) | `results/06` §2 |

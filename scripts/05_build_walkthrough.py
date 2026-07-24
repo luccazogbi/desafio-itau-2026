@@ -149,8 +149,16 @@ histórico **inteiro** dela, inclusive os anos em que era constituinte saudável
 nome do passado — o painel **não é estável entre execuções**, e a cobertura deve ser lida
 como medição *daquela data*.
 
-*(No Russell 2000 a cobertura das deslistadas seria 18% vs 92% — foi por isso que a
-estratégia migrou para o S&P 500; ver `considerações/`.)*
+**(c) O backtest não vive um único deslistamento.** Durante 2020-2023, 68 empresas
+saíram do índice pela composição as-of — e o motor processou **zero** liquidações por
+deslistagem. As empresas não *saem* do painel no meio: elas **nunca entram**, porque o
+histórico inteiro foi apagado. O universo as-of resolve o viés de *seleção de membros*;
+não resolve o de *seleção de desfechos* (`results/08`).
+
+*(A migração para o S&P 500 se deu porque, entre as ações **removidas** do índice, só
+**18%** têm preço recuperável no Russell 2000 contra **46%** no S&P 500 — comparação
+entre deslistadas dos dois universos. Medição de 14/07, hoje **não re-derivável**;
+ver `considerações/`.)*
 
 #### ⚠️ Nota sobre o "gap" no início do gráfico 1.3a
 
@@ -847,20 +855,31 @@ md("""
 
 ### 8.1 O que já está validado
 
-1. **Pipeline**: recuperou alfa plantado em painel sintético (gabarito), P&L verificado
-   contra a biblioteca `bt` (corr 0,996), 14 testes automáticos (anti-lookahead de 9
-   sinais, neutralidade + setor, custos convexos);
+1. **Pipeline**: recuperou alfa plantado em painel sintético (gabarito), **20 testes**
+   automáticos (anti-lookahead de 9 sinais, neutralidade + setor, custos convexos,
+   trava do holdout, aluguel do short, Newey-West, Gârleanu-Pedersen, snapshot);
+   P&L verificado contra a biblioteca `bt` (corr 0,996) — **no painel sintético**;
+   o crosscheck nos dados reais segue **em aberto**;
 2. **Dados**: S&P 500 as-of com viés de seleção resolvido e viés de dados quantificado
-   (92% membros; removidos 46% vs 99% sobreviventes);
+   (cobertura **92,8%** dos membros as-of). *Os números de cobertura das deslistadas
+   (46% no S&P 500, 18% no R2000) são medição de 14/07 e **não são re-deriváveis**
+   hoje — ver `considerações/`;*
 3. **Sinal**: `resid_ou` escolhido por evidência (11 candidatos testados no total;
    blend descartado duas vezes por não agregar);
-4. **Backtest oficial dev+val** rodado com mandato completo (seção 7).
+4. **Backtest oficial dev+val** rodado com mandato completo (seção 7);
+5. **Análise crítica**: capacidade (`results/02`), regime de vol (`results/03`),
+   auditoria de composição (`04`), calibração de custos (`05`), multi-período
+   Gârleanu-Pedersen (`06`), tentativas de elevar o Sharpe (`07`) e ausência de
+   deslistamento no painel (`08`).
 
 ### 8.2 Próximos passos
 
-1. **Análise crítica** dos resultados (custos, capacidade, crises 2020/2022);
-2. **Ida única ao holdout** (2024+) — o número final da estratégia;
-3. **Relatório de 5 páginas + robô** (prazos: pré-relatório 31/07, final 17/08).
+1. **Decisões de calibração em aberto**: `rebalance_every_days` 3 → 10 (+0,06 esperado)
+   e *tranching* para eliminar a dependência de fase (`results/07`);
+2. **Crosscheck `bt` nos dados reais** e validação independente da composição
+   (IVV via SEC EDGAR N-PORT);
+3. **Ida única ao holdout** (2024+) — o número final da estratégia;
+4. **Relatório de 5 páginas + robô** (prazos: pré-relatório 31/07, final 17/08).
 
 ### 8.3 Glossário
 

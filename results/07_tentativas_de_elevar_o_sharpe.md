@@ -7,6 +7,8 @@
 > **Artefatos:** `reports/kappa_analysis.md` · `scripts/10_kappa_analysis.py` ·
 > `scripts/02_run_backtest.py --rebalance`
 > **Holdout:** tudo em dev+val (2020-2023). **Intocado.**
+> **Atualizado em 24/07/2026** — §1 ganhou o modelo nulo que invalida o argumento do
+> "só 4% não revertem" (o veredito não muda).
 
 ---
 
@@ -38,15 +40,45 @@ referência de forma mais fiel, com justificativa teórica anterior ao dado.
 na velocidade de reversão, o oposto do previsto. Restringir às rápidas derrubaria o IC
 em **25%**.
 
-Além disso, só **4%** do universo falha o teste de reversão (AR(1) com b ≥ 1). Não há
-praticamente nada a filtrar num universo de large caps.
+### O "só 4% não revertem" não significa nada (corrigido em 24/07)
+
+A versão anterior deste documento usava um segundo argumento: *"só 4% do universo falha o
+teste de reversão (AR(1) com b ≥ 1), então não há nada a filtrar"*. **Esse argumento não se
+sustenta**, por duas razões medidas depois:
+
+| Critério | universo real | **ruído iid puro** |
+|---|---:|---:|
+| `b ≥ 1` (o que usávamos) | 4% | **5%** |
+| `b ≥ 1` **ou** `tau ≥ J/2` (critério real do A&L) | 19% | **22%** |
+
+Um caminho cumulativo de ruído iid é um passeio aleatório — por construção **não reverte**.
+Ainda assim ele "passa" no teste `b < 1` em 95% dos casos, porque o OLS de um AR(1) perto da
+raiz unitária tem viés de baixa em amostra pequena (Dickey-Fuller: `E[b] ≈ 1 − 5,3/T`, com
+T = 59). O universo real é **indistinguível do ruído** sob esse corte.
+
+Duas correções decorrentes:
+
+1. **O critério que aplicávamos não era o do A&L.** O paper não descarta só `b ≥ 1`; exige
+   reversão rápida o bastante para a janela (`tau < J/2`). Sob o critério correto o corte é
+   **19%**, não 4%.
+2. **A constante de tempo estava rotulada como meia-vida.** `tau = 12 dias` é a constante de
+   tempo; a meia-vida é `ln2·tau ≈ 8 dias`. O relatório antigo superestimava a persistência
+   em ~44%.
+
+**Nada disso muda o veredito**, porque a conclusão vem da tabela de quartis — uma comparação
+*relativa* entre ações medidas do mesmo jeito, onde o viés de amostra pequena atinge todas
+igualmente — e não do corte binário.
 
 ### Por que faz sentido econômico
 
-Nosso sinal acumula resíduos por **60 dias** e tem meia-vida medida de **21,7 dias**
-(`results/06`). Ele é construído para reversão **lenta**. Resíduos que revertem em poucos
-dias são provavelmente ruído de microestrutura — já arbitrados por HFT em large caps, e
-mortos antes de o acumulador de 60 dias sequer registrá-los.
+Nosso sinal acumula resíduos por **60 dias**, e a autocorrelação do z-score decai com
+meia-vida de **21,4 dias** (`results/06`). Ele é construído para reversão **lenta**.
+Resíduos que revertem em poucos dias são provavelmente ruído de microestrutura — já
+arbitrados por HFT em large caps, e mortos antes de o acumulador de 60 dias sequer
+registrá-los.
+
+*(Ressalva de `results/06`: essa meia-vida é em boa parte consequência mecânica da própria
+janela de 60 dias, não uma medida limpa da persistência econômica do fenômeno.)*
 
 *Resultado negativo, mas informativo: a decisão de operar todo o universo, que era
 implícita, agora tem respaldo empírico.*
@@ -101,7 +133,7 @@ A dispersão de fase (0,26) é **maior** que a suposta melhora de 3→10 dias (0
 Agora a história é coerente e o mecanismo é verificável:
 
 - **o alfa bruto é praticamente constante** (0,499 → 0,516) — como deveria ser, já que o
-  sinal tem meia-vida de 21,7 dias e não se perde muito ao segurar posição por mais tempo;
+  sinal tem meia-vida de ~21 dias e não se perde muito ao segurar posição por mais tempo;
 - **os custos caem monotonicamente** (211 → 168 bps/ano);
 - **o líquido sobe como consequência aritmética disso**, não por sorte.
 
