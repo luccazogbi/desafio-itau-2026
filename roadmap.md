@@ -112,15 +112,26 @@ beta com **SPY**. Sinal oficial: **`resid_ou`** (reversão de resíduo, Avellane
 - [ ] Verificar sinais de alfa da literatura para o novo modelo de estratégia que estamos buscando (Big Caps - S&P 500)
   > Pesquisa 14/07 (Claude): 3 candidatos implementados e TESTADOS no funil
   > (dev/val, S&P 500 as-of). Veredito: **NENHUM agrega — blend segue descartado.**
-  > Resultados em `reports/funnel.md` e `reports/blend_analysis.md`:
-  - [x] **STM** (Medhat-Schmeling, *RFS* 2022): CORTADO — no nosso universo fator-neutro o efeito INVERTE (IC21 dev −0,057, t −3,6) e é o anti-resid_ou (corr P&L −0,67)
-  - [x] **Overnight** (Lou-Polk-Skouras, *JFE* 2019): CORTADO — IC ≈ 0, inconsistente entre splits (painel ganhou `prices_open` de brinde, script 07c)
-  - [x] **Salience** (Cosemans-Frehen, *JFE* 2021): CORTADO — dev IC21 t 2,8 mas NÃO valida (val t 0,3) e é redundante c/ resid_ou (corr P&L +0,66)
+  > **Re-medido em 24/07 no painel atual, com t Newey-West** (os números de 14/07 eram t
+  > INGÊNUOS — a correção de 22/07 chegou ao `resid_ou` e não aos cortados).
+  > Artefatos: `reports/funnel.md` (12 linhas) e `reports/blend_analysis.md`.
+  - [x] **STM** (Medhat-Schmeling, *RFS* 2022): CORTADO — no nosso universo fator-neutro o
+        efeito **INVERTE**: IC21 dev **−0,054** (t_NW **−2,25**; o "t −3,6" citado antes era o
+        ingênuo, hoje −3,37). É o anti-resid_ou (corr P&L **−0,667**).
+  - [x] **Overnight** (Lou-Polk-Skouras, *JFE* 2019): CORTADO — IC ≈ 0 e troca de sinal entre
+        splits (IC21 dev −0,021 / val +0,010). Confirmado (painel ganhou `prices_open` de
+        brinde, script 07c).
+  - [x] **Salience** (Cosemans-Frehen, *JFE* 2021): CORTADO — e o corte fica **mais forte** com
+        Newey-West: dev IC21 t **1,77** (não 2,8 — aquele era o ingênuo), ou seja **nem passa
+        no dev**; val t **0,13**. Redundante c/ resid_ou (corr P&L **+0,655**).
   - [x] Funil + análise de correlação rodados (scripts 04 e 09) — decisão por evidência
   > Conclusão: **`resid_ou` segue sendo O sinal.** Sinais novos só com mudança estrutural
   > (dados pagos, small caps, ou afrouxar neutralidade) — decisão futura c/ orientador.
 
-- [x] **11** candidatos da literatura implementados como plug-ins (`statarb/signals/`)
+- [x] **11** candidatos da literatura implementados como plug-ins (`statarb/signals/`) —
+      dos quais **10 são avaliáveis no painel real**: o `earnings_yield` exige EPS, que o
+      painel gratuito não tem, e sempre foi rotulado como sinal de **validação da esteira**
+      no sintético (cobertura 0,00 no funil, linha `NaN`).
 - [x] Funil de avaliação (IC 1/5/21d vs retorno residual, quintis, splits dev/val/holdout) — `scripts/04_signal_funnel.py`
 - [x] Funil rodado no S&P 500 as-of → **`resid_ou` é o melhor dos 11** — mas o quão forte é
       a evidência mudou com a correção de 22/07. Medido com **Newey-West** (23/07):
@@ -135,7 +146,31 @@ beta com **SPY**. Sinal oficial: **`resid_ou`** (reversão de resíduo, Avellane
       e consistente nos dois splits (0,051 / 0,036), o dev é significativo, mas **a validação
       fica em t = 1,66 — abaixo de 2**. `resid_ou` continua sendo a melhor escolha entre os
       candidatos, mas "robusto nos dois splits" era forte demais.
-- [x] Blend testado e **descartado** (str_turnover não agregou; demais são proxies de fator)
+- [x] **Funil COMPLETO re-rodado (24/07)** — o artefato só tinha o `resid_ou`, porque
+      `04_signal_funnel.py resid_ou` sobrescreve o `funnel.md` do funil inteiro. Agora
+      `reports/funnel.md` tem as **12 linhas** (11 sinais + blend) que sustentam a decisão.
+      **O `resid_ou` reproduziu bit a bit** os números de 23/07 (diferença máxima 0,0) —
+      teste de reprodutibilidade de graça, ganho por acaso. IC21 por sinal:
+
+      | sinal | IC21 dev (t_NW) | IC21 val (t_NW) | veredito |
+      |---|---:|---:|---|
+      | **`resid_ou`** | **+0,051 (2,50)** | **+0,036 (1,66)** | **escolhido** |
+      | blend | +0,051 (2,47) | +0,034 (1,51) | **pior que o `resid_ou` sozinho** |
+      | idio_reversal | +0,024 (2,02) | +0,019 (1,21) | positivo nos 2, mais fraco |
+      | str_turnover | +0,031 (1,31) | +0,020 (0,71) | cobertura 26%, t baixo |
+      | salience | +0,028 (1,77) | +0,003 (0,13) | não valida |
+      | seasonality | +0,015 (0,79) | −0,009 (−0,44) | ~0 |
+      | mad · trend_factor · left_tail | ~0 ou negativo | ~0 ou negativo | cortados |
+      | overnight | −0,021 (−1,61) | +0,010 (0,54) | troca de sinal |
+      | stm | −0,054 (−2,25) | −0,017 (−0,52) | inverte |
+
+      ⚠️ **Risco de repetição:** o `04` grava sempre no mesmo `funnel.md`, então rodar um
+      subconjunto apaga o funil completo em silêncio — mesmo padrão do `07` sem `07b`.
+- [x] Blend testado e **descartado** — agora com artefato: o blend rende IC21 **0,051 dev /
+      0,034 val** contra **0,051 / 0,036** do `resid_ou` puro. Ou seja, adicionar
+      `str_turnover` **piora** a validação. Confirmado por correlação (`scripts/09`): STM tem
+      corr de P&L **−0,667** com o `resid_ou` e salience **+0,655** — um é o espelho, o outro
+      é redundante; nenhum traz informação nova.
 - [x] Notebook explicativo focado no `resid_ou`, passo a passo (`notebooks/pipeline_walkthrough.ipynb`)
 - [ ] (fino) Sensibilidade dos parâmetros do `resid_ou` (acúmulo J=60d, janela z W=252d) — sem overfitar
 

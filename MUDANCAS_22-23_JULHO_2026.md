@@ -424,6 +424,8 @@ A **forma** monotônica — que é a conclusão — não mudou.
    | Notebook uma versão **atrás** do gerador | 92,9% vs 92,8%; "14 testes" | regenerado; gerador corrigido p/ 20 |
    | "18% vs 92%" ainda circulando | roadmap, considerações, notebook | corrigido p/ **18% vs 46%** (mesmo denominador) |
    | Deslistamento **nunca ocorre** no backtest | custo 0,0 bps era caminho morto | novo `results/08` + `scripts/17` |
+   | **Funil dos 11 e blend sem artefato** | `04` sobrescrevia o próprio funil ao rodar um subconjunto | re-rodados; `04` corrigido na raiz |
+   | t-stats dos sinais **cortados** ainda ingênuos | NW de 22/07 só chegou ao `resid_ou` | STM −3,6→**−2,25**; salience 2,8→**1,77** |
 
 4. **Dois números-chave não são reproduzíveis** ⚠️ — `scripts/08` carrega
    `data/raw/iwm_2019_split.pkl`, que **nenhum script gera**; e

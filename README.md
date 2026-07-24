@@ -48,7 +48,10 @@ $py = "$env:USERPROFILE\.venvs\quant_ai_2026\Scripts\python.exe"
 & $py scripts\14_cost_calibration.py
 
 # pesquisa de sinais: funil (IC/quintis, splits dev/val) e correlacoes p/ blend
-& $py scripts\04_signal_funnel.py resid_ou
+# SEM argumentos = funil COMPLETO (11 sinais + blend) -> reports/funnel.md.
+# Com argumentos roda um subconjunto e grava em funnel_<nomes>.md, PRESERVANDO
+# o funil completo (que e o artefato da escolha do sinal).
+& $py scripts\04_signal_funnel.py
 & $py scripts\09_blend_analysis.py
 
 # BACKTEST OFICIAL (dev+val 2020-2023). O holdout e trancado PELO CONFIG:
@@ -109,10 +112,13 @@ data/ reports/        <- gerados pelos scripts (fora do git)
 1. **Universo S&P 500 as-of** — R2000 gratuito tem survival bias muito mais severo: das
    ações **removidas** do índice, só **18%** têm preço no R2000 contra **46%** no S&P 500;
    ver `considerações/`.
-2. **Sinal único `resid_ou`** — funil de 11 candidatos: é o melhor, com IC positivo e
+2. **Sinal único `resid_ou`** — funil de 11 candidatos (10 avaliáveis no painel real; o
+   `earnings_yield` exige EPS que o dado gratuito não tem): é o melhor, com IC positivo e
    consistente nos dois splits (IC21 0,051 dev / 0,036 val). Com t-stat corrigido por
    Newey-West: **t = 2,50 dev / 1,66 val** — o dev é significativo, a validação não
-   chega a 2. Blend testado 2× e descartado (não agrega).
+   chega a 2. Blend testado 2× e descartado — medido: o blend rende 0,051/0,034 contra
+   0,051/**0,036** do `resid_ou` puro, ou seja **piora a validação**.
+   Evidência completa em `reports/funnel.md` (12 linhas) e `reports/blend_analysis.md`.
 3. **Sem Bloomberg** até etapas futuras do desafio — fontes: Wikipedia/fja05680
    (membership), yfinance (preços), Ken French (fatores), Nasdaq screener (mcap/setor).
 

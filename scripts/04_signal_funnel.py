@@ -146,15 +146,31 @@ def main() -> None:
 
     table = pd.DataFrame(all_rows).set_index(["signal", "split"]).round(4)
     rep = path_of(cfg, "reports")
-    table.to_parquet(rep / "funnel.parquet")
-    with open(rep / "funnel.md", "w", encoding="utf-8") as fh:
-        fh.write("# Funil de sinais\n\n" + table.to_markdown() + "\n")
+
+    # NAO sobrescrever o funil COMPLETO com uma rodada parcial. O `funnel.md` e o
+    # artefato que sustenta a escolha do sinal ("melhor dos 11"); rodar
+    # `04_signal_funnel.py resid_ou` apagava esse artefato em silencio e deixava a
+    # decisao central do projeto sem lastro. Mesmo padrao do `07` sem `07b`.
+    parcial = bool(args)
+    nome = f"funnel_{'_'.join(sorted(args))}" if parcial else "funnel"
+    table.to_parquet(rep / f"{nome}.parquet")
+    cabecalho = (
+        f"# Funil de sinais — RODADA PARCIAL ({', '.join(args)})\n\n"
+        "> ⚠️ Subconjunto de sinais. O funil COMPLETO, que sustenta a escolha do sinal\n"
+        "> oficial, fica em `funnel.md` — rode `scripts/04_signal_funnel.py` sem argumentos.\n\n"
+        if parcial else "# Funil de sinais\n\n"
+    )
+    with open(rep / f"{nome}.md", "w", encoding="utf-8") as fh:
+        fh.write(cabecalho + table.to_markdown() + "\n")
+    if parcial:
+        print(f"\n[!] RODADA PARCIAL ({len(args)} sinal(is)): gravado em {nome}.md")
+        print("[!] O funil completo em funnel.md foi PRESERVADO.")
 
     pd.set_option("display.width", 160)
     print("\n================== FUNIL DE SINAIS ==================")
     print(table.to_string())
     print("=====================================================")
-    print(f"salvo em {rep / 'funnel.md'} | tempo: {time.time() - t0:.0f}s")
+    print(f"salvo em {rep / (nome + '.md')} | tempo: {time.time() - t0:.0f}s")
 
 
 if __name__ == "__main__":
