@@ -175,9 +175,10 @@ def main() -> None:
 
     print("[4/5] Participacao REAL da estrategia e plausibilidade do eta...")
     book = float(cfg["book"]["gross_usd"])
-    giro_anual = 15.0                      # turnover one-way medido no backtest dev+val
+    giro_anual = 11.0                      # turnover one-way medido no backtest dev+val
+                                           #   (era 15.0 com rebalance de 3 dias)
     cada = int(cfg["execution"]["rebalance_every_days"])
-    n_pos = 265                            # posicoes medias medidas no backtest
+    n_pos = 278                            # posicoes medias medidas no backtest (era 265)
     usd_por_rebalance = book * giro_anual / 252.0 * cada
     usd_por_nome = usd_por_rebalance / n_pos
     adv_mediano = float(tab["adv_usd"].median())

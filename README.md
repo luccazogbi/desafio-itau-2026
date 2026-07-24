@@ -71,15 +71,22 @@ $py = "$env:USERPROFILE\.venvs\quant_ai_2026\Scripts\python.exe"
 
 | | |
 |---|---:|
-| Sharpe bruto / líquido | **+0,51 / +0,16** |
-| Retorno líquido | +0,96% a.a. (sobre o gross) |
-| Custos | 211 bps/ano (impacto 60% · spread 30% · aluguel do short 9%) |
-| Turnover | 15,6× /ano (one-way) |
-| Max drawdown | −11,3% |
+| Sharpe bruto / líquido | **+0,57 / +0,27** |
+| **Sharpe líquido, média entre fases** | **+0,21 ± 0,09** ← *o número honesto* |
+| Retorno líquido | +1,49% a.a. (sobre o gross) |
+| Custos | 168 bps/ano (impacto 61% · spread 26% · aluguel do short 12%) |
+| Turnover | 11,0× /ano (one-way) |
+| Max drawdown | −7,9% |
 | Snapshot do painel | `2026-07-23` |
 
+> ⚠️ **Por que duas linhas de Sharpe.** O resultado depende de em que dia do calendário se
+> começa a operar: fixando tudo e deslocando só a data inicial, o Sharpe varia de **0,077 a
+> 0,341** (`results/07` §2.2). A data oficial (2020-01-02) foi fixada a priori pelo warm-up
+> dos betas, mas calhou de cair no lado favorável. **A expectativa da estratégia é 0,21, não
+> 0,27.** A correção estrutural (*tranching*) está identificada e não implementada.
+
 Diagnóstico completo em [`results/01`](results/01_analise_backtest_dev_val.md). A curva de
-capacidade ([`results/02`](results/02_analise_capacidade.md)) mostra **0,33 em $100mm** —
+capacidade ([`results/02`](results/02_analise_capacidade.md)) mostra **0,41 em $100mm** —
 o mandato de $1 bi opera acima do tamanho ótimo da estratégia.
 
 ## Estrutura

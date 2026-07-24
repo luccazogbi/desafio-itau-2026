@@ -78,16 +78,22 @@ Tóth et al. (2011), idem. Não há como estimar aqui — e fingir que há seria
 
 O que dá para fazer é **testar plausibilidade contra σ e ADV reais deste universo**:
 
-| η | participação típica (0,47% ADV) | a 1% do ADV | a 5% (cap) |
+| η | participação típica (1,10% ADV) | a 1% do ADV | a 5% (cap) |
 |---|---:|---:|---:|
-| 0,25 | 3,5 bps | 5,1 bps | 11,4 bps |
-| **0,50 (config)** | **7,0 bps** | **10,2 bps** | **22,8 bps** |
-| 0,75 | 10,5 bps | 15,3 bps | 34,2 bps |
-| 1,00 | 14,0 bps | 20,4 bps | 45,6 bps |
+| 0,25 | 5,6 bps | 5,3 bps | 11,9 bps |
+| **0,50 (config)** | **11,2 bps** | **10,6 bps** | **23,8 bps** |
+| 0,75 | 16,7 bps | 15,9 bps | 35,6 bps |
+| 1,00 | 22,3 bps | 21,3 bps | 47,5 bps |
 
 Frazzini-Israel-Moskowitz (2018) e Almgren et al. (2005) situam o impacto de uma ordem de
 ~1% do ADV em large caps americanas na faixa de **5–15 bps**. Com σ real de 2,1%/dia,
-η = 0,5 implica **10,2 bps** — dentro da faixa. **→ mantido.**
+η = 0,5 implica **10,6 bps** — dentro da faixa. **→ mantido.**
+
+> **Nota (24/07):** este teste ficou **mais informativo** depois que
+> `rebalance_every_days` passou de 3 para 10. Antes a estratégia operava a 0,47% do ADV e a
+> faixa publicada de referência (~1% do ADV) era extrapolação; agora ela opera a **1,10%**,
+> praticamente **em cima** do ponto onde a literatura mede. A plausibilidade de η deixou de
+> depender de extrapolação.
 
 ---
 
@@ -95,15 +101,21 @@ Frazzini-Israel-Moskowitz (2018) e Almgren et al. (2005) situam o impacto de uma
 
 | | |
 |---|---:|
-| ADV mediano do universo | US$ 152 mm |
+| ADV mediano do universo | US$ 142 mm |
 | Vol diária mediana | 2,1% |
-| Trade típico por nome | US$ 0,71 mm |
-| **Participação típica** | **0,47% do ADV** |
+| Trade típico por nome | US$ 1,57 mm |
+| **Participação típica** | **1,10% do ADV** |
 | Cap de participação | 5% do ADV |
 
-A estratégia opera a **um décimo do seu próprio cap**. O impacto de mercado não é limitado
+A estratégia opera a **um quinto do seu próprio cap** (era um décimo com rebalance de 3
+dias — girar menos vezes torna cada trade maior). O impacto de mercado não é limitado
 pela restrição — é limitado pelo tamanho do book contra o alfa disponível, o que é coerente
 com a análise de capacidade (`results/02`).
+
+> **Efeito colateral a monitorar:** espaçar o rebalanceamento **concentra** o trade. A
+> participação mais que dobrou (0,47% → 1,10%). Ainda há folga de 5×, mas essa folga é o que
+> permitiria escalar o book — e ela encolheu junto. Espaçar mais ainda (15, 20 dias) empurra
+> a estratégia contra o próprio cap de liquidez.
 
 ---
 
@@ -114,6 +126,6 @@ um resultado, não uma falha: a diferença entre "usamos 0,5 porque a literatura
 "0,5 não é estimável com os dados disponíveis, e verificamos que implica 10 bps a 1% do ADV,
 dentro da faixa publicada" é exatamente o tipo de rigor que o edital pede.
 
-**Efeito líquido no backtest:** spread de 5,0 → 4,0 bps economiza ~15 bps/ano sobre o gross
-(giro de 15×/ano), compensando parte dos ~20 bps/ano do aluguel de short que passou a ser
+**Efeito líquido no backtest:** spread de 5,0 → 4,0 bps economiza ~11 bps/ano sobre o gross
+(giro de 11×/ano), compensando parte dos ~20 bps/ano do aluguel de short que passou a ser
 cobrado nas correções de 22/07.

@@ -13,13 +13,17 @@
 
 ### Desempenho da estratégia por regime (dev+val, 2020–2023)
 
-> **Atualizado em 23/07/2026** — regerado após as correções de 22/07 e a calibração de custos.
+> **Atualizado em 24/07/2026** — regerado com `rebalance_every_days = 10` (era 3).
 
 | Regime | Vol média SPY | Sharpe bruto | Sharpe líquido | Ret. líquido a.a. |
 |---|---:|---:|---:|---:|
-| Vol baixa | 10% | +0,42 | **−0,26** | −0,8% |
-| Vol média | 16% | +0,33 | −0,33 | −1,1% |
-| **Vol ALTA** | 30% | **+0,74** | **+0,51** | **+4,8%** |
+| Vol baixa | 10% | +0,40 | **−0,18** | −0,5% |
+| Vol média | 16% | +0,28 | −0,19 | −0,6% |
+| **Vol ALTA** | 30% | **+0,86** | **+0,65** | **+5,6%** |
+
+*Versão anterior (rebalance 3d): −0,26 / −0,33 / +0,51. Girar menos **reduziu o prejuízo nos
+regimes calmos** — exatamente onde o IC é zero e só se paga custo — e ampliou o ganho em vol
+alta. O padrão fica mais nítido, não diferente.*
 
 ### Qualidade pura do sinal (IC, sem otimizador nem custos)
 
@@ -47,10 +51,10 @@
 
 | Ano | Vol média SPY | Sharpe líquido do ano |
 |---|---:|---:|
-| 2020 | **26%** | **+0,44** ✓ |
-| 2021 | 12% | +0,26 |
-| 2022 | **24%** | +0,16 |
-| 2023 | 13% | **−0,71** ✗ |
+| 2020 | **26%** | **+0,64** ✓ |
+| 2021 | 12% | +0,02 |
+| 2022 | **24%** | +0,30 |
+| 2023 | 13% | **−0,45** ✗ |
 
 ---
 

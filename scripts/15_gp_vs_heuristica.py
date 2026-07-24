@@ -153,8 +153,9 @@ def main() -> None:
     ivol = fm.idio_asof(pd.Timestamp(FIM_AMOSTRA))
     sigma_idio = float(np.nanmedian(ivol.values)) if ivol is not None else 0.015
     adv_mediano = float(md.adv.loc[:FIM_AMOSTRA].median().median())
-    # trade tipico por nome: giro 15x/ano, rebalance a cada 3d, ~263 posicoes
-    giro, cada, n_pos = 15.6, int(cfg["execution"]["rebalance_every_days"]), 263
+    # trade tipico por nome: medido no backtest dev+val vigente
+    # (era 15.6x/ano e 263 posicoes com rebalance de 3 dias)
+    giro, cada, n_pos = 11.0, int(cfg["execution"]["rebalance_every_days"]), 278
     dw_tipico = (giro / 252.0 * cada) / n_pos
     fit = ajusta_custo_quadratico(cfg, sigma_idio, adv_mediano, book, dw_tipico)
     L = fit["lambda"]

@@ -874,8 +874,11 @@ md("""
 
 ### 8.2 Próximos passos
 
-1. **Decisões de calibração em aberto**: `rebalance_every_days` 3 → 10 (+0,06 esperado)
-   e *tranching* para eliminar a dependência de fase (`results/07`);
+1. ***Tranching*** — girar ~10% do book todo dia em vez de 100% a cada 10 dias. É a
+   fragilidade estrutural em aberto: o resultado ainda depende de **em que dia se começa
+   a operar** (Sharpe de 0,077 a 0,341 só deslocando a data inicial). Espaçar o
+   rebalanceamento de 3 para 10 dias (feito em 24/07) melhorou o patamar, mas **não**
+   removeu essa dependência — só o tranching remove (`results/07` §3);
 2. **Crosscheck `bt` nos dados reais** e validação independente da composição
    (IVV via SEC EDGAR N-PORT);
 3. **Ida única ao holdout** (2024+) — o número final da estratégia;

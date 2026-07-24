@@ -438,9 +438,12 @@ A **forma** monotônica — que é a conclusão — não mudou.
 
 ## 9. O que ficou pendente
 
+> **Atualização de 24/07:** o primeiro item desta tabela foi **decidido e executado** — ver
+> a nota no fim desta seção.
+
 | Item | Situação |
 |---|---|
-| `rebalance_every_days` 3 → 10 | **decisão do usuário** — vale ~+0,06, move todos os números |
+| `rebalance_every_days` 3 → 10 | ✅ **ADOTADO em 24/07** (era decisão do usuário) |
 | Implementar *tranching* | proposto — elimina a dependência de fase |
 | Crosscheck `bt` nos dados reais | o 0,996 documentado é do painel **sintético** |
 | Validação independente da composição | S&P Global bloqueia (HTTP 403); rota: IVV via SEC EDGAR |
@@ -448,9 +451,36 @@ A **forma** monotônica — que é a conclusão — não mudou.
 | Condicionar exposição ao regime de vol | só vale se **pré-registrado** e testado no holdout |
 | **Ida ao holdout (2024+)** | **NÃO FEITO** — segue trancado |
 
+### Nota de 24/07 — `rebalance_every_days` 3 → 10, adotado
+
+A decisão foi tomada e todos os números do projeto foram regerados (scripts 02, 05, 11, 12,
+14, 15, 17 + notebook).
+
+| | 3 dias | **10 dias** |
+|---|---:|---:|
+| Sharpe bruto / líquido | 0,51 / 0,16 | **0,57 / 0,27** |
+| Custos | 211 bps | **168 bps** |
+| Turnover | 15,6× | **11,0×** |
+| Max drawdown | −11,3% | **−7,9%** |
+| P&L líquido | $38,3mm | **$59,3mm** |
+| \|net\| com hedge | 0,022 | 0,042 ⚠️ |
+| Participação no ADV | 0,47% | 1,10% ⚠️ |
+
+**Base da decisão: o canal de custo, não o Sharpe.** Na média entre fases de calendário o
+alfa bruto é constante (0,499 → 0,516) e os custos caem monotonicamente — o líquido sobe por
+aritmética. Ganho atribuível: **+0,06**.
+
+⚠️ **A rodada oficial marca 0,266, mas a expectativa honesta é 0,205 ± 0,09.** A data de
+início (2020-01-02) foi fixada a priori pelo warm-up dos betas, mas é uma fase **favorável** —
+e a tabela de fases de `results/07` §2.2 previa exatamente 0,568/0,266 para ela, reproduzindo
+ao centavo. Espaçar o rebalanceamento **não removeu** a dependência de fase; só mudou o
+patamar. Isso só sai com *tranching*.
+
 ---
 
 ## 10. Estado final verificado
+
+Estado **ao fim de 23/07**, que é o escopo deste documento:
 
 ```
 20 testes passando
@@ -458,6 +488,16 @@ backtest oficial: Sharpe 0,160 · snapshot 2026-07-23 · 2020-01-02 a 2023-12-29
 665 tickers × 2113 dias · cobertura 92,8%
 16/16 números dos .md conferidos contra os artefatos
 ```
+
+> **Estado ATUAL (24/07), após a decisão de `rebalance_every_days` 3 → 10:**
+> ```
+> 20 testes passando
+> backtest oficial: Sharpe 0,266 (média entre fases 0,205 ± 0,09)
+> custos 168 bps · turnover 11,0× · max DD -7,9% · P&L $59,3mm
+> snapshot 2026-07-23 (painel inalterado) · 2020-01-02 a 2023-12-29
+> ```
+> O painel **não mudou** — só o parâmetro de execução. A rastreabilidade via snapshot
+> permite afirmar isso com certeza, que era exatamente o problema que ele veio resolver.
 
 **O holdout nunca foi tocado.** Nenhum backtest, IC, sinal ou métrica de desempenho passou
 de 2023-12-29, e o motor agora recusa fazê-lo sem flag explícita.

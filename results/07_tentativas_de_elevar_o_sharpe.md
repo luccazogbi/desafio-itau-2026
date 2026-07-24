@@ -2,8 +2,8 @@
 
 > **Pergunta:** o que dá para fazer para o Sharpe subir **sem inflar o número**?
 > Duas hipóteses foram testadas: **(1)** filtrar ações pela velocidade de reversão,
-> como no Avellaneda-Lee original; **(2)** reduzir o giro, já que os custos consomem
-> 69% do alfa bruto.
+> como no Avellaneda-Lee original; **(2)** reduzir o giro, que na época consumia
+> 69% do alfa bruto (hoje 53%, justamente por causa da decisão tomada aqui).
 > **Artefatos:** `reports/kappa_analysis.md` · `scripts/10_kappa_analysis.py` ·
 > `scripts/02_run_backtest.py --rebalance`
 > **Holdout:** tudo em dev+val (2020-2023). **Intocado.**
@@ -91,10 +91,10 @@ implícita, agora tem respaldo empírico.*
 
 | rebalance | Sharpe bruto | Sharpe líquido | turnover | custos |
 |---:|---:|---:|---:|---:|
-| 3 (atual) | 0,511 | 0,160 | 15,6× | 211 |
+| 3 (era o default) | 0,511 | 0,160 | 15,6× | 211 |
 | 5 | 0,435 | 0,105 | 13,3× | 191 |
 | 8 | 0,401 | 0,075 | 11,8× | 177 |
-| **10** | 0,568 | **0,266** | 11,0× | 168 |
+| **10 (adotado em 24/07)** | 0,568 | **0,266** | 11,0× | 168 |
 | 15 | 0,422 | 0,138 | 9,6× | 152 |
 
 Tentador parar aqui e adotar 10 dias (+0,11 de Sharpe!). **Dois sinais de alerta
@@ -172,18 +172,41 @@ decide o book inteiro). É a recomendação técnica mais concreta deste documen
 | # | Ação | Base | Status |
 |---|---|---|---|
 | 1 | **Não** implementar o filtro de κ | Evidência contrária, medida | ✅ decidido |
-| 2 | `rebalance_every_days` 3 → **10** | Bruto constante + custos −20% | ⏸️ **aguarda decisão** |
+| 2 | `rebalance_every_days` 3 → **10** | Bruto constante + custos −20% | ✅ **ADOTADO 24/07** |
 | 3 | Implementar **tranching** | Elimina dependência de fase | 📋 proposto |
 | 4 | Reportar a curva de capacidade como conclusão | Já medido (`results/02`) | ✅ feito |
 
-### Sobre a recomendação 2
+### Sobre a recomendação 2 — adotada em 24/07
 
 Mudar o `rebalance_every_days` é uma **decisão de calibração tomada em dev+val** — a mesma
 natureza do `alpha_bps_per_z = 3`. É defensável porque o argumento é o **canal de custo**
 (robusto: bruto constante, custos caindo monotonicamente), e **não** "escolhemos o valor de
 maior Sharpe". Se fosse pelo Sharpe, teríamos escolhido a fase 2020-01-03 e reportado 0,341.
 
-O parâmetro **não foi alterado** — a decisão é sua, e ela move todos os números do relatório.
+**O que aconteceu ao adotar** (`results/01`): a rodada oficial saiu com Sharpe líquido
+**0,266**, custos de 211 → **168 bps** e turnover de 15,6× → **11,0×**.
+
+> ⚠️ **Os 0,266 são a fase 2020-01-02, que é o lado FAVORÁVEL da distribuição.** A tabela
+> §2.2 já previa exatamente isso (0,568 bruto / 0,266 líquido para esta data de início) — e
+> reproduziu ao centavo. A expectativa honesta continua sendo a **média entre fases: 0,205**,
+> com dispersão de ±0,09. A data de início não foi escolhida agora: está no config desde o
+> começo, fixada pelo warm-up dos betas. Mas o fato de ela ser favorável **precisa** ser
+> reportado junto com o número.
+
+**Ganho atribuível ao mecanismo: ~+0,06.** O resto é calendário.
+
+### Custos colaterais da mudança (não aparecem no Sharpe)
+
+Registrados porque a decisão não é gratuita:
+
+| Efeito | Antes (3d) | Depois (10d) |
+|---|---:|---:|
+| \|net\| do livro **com hedge** | 0,022 | **0,042** |
+| Participação típica no ADV | 0,47% | **1,10%** |
+
+O hedge precisa carregar posição maior porque o beta residual deriva mais entre decisões, e
+cada trade fica maior porque se negocia menos vezes. Nenhum dos dois viola o mandato, mas os
+dois **consomem folga** — e é essa folga que permitiria escalar o book.
 
 ---
 
@@ -197,5 +220,10 @@ O parâmetro **não foi alterado** — a decisão é sua, e ela move todos os n�
 | Condicionar exposição ao regime de vol | potencialmente grande | A análise de regime é *post-hoc* no dev+val; só vale se **pré-registrada** e testada no holdout (`results/03` §3.2) |
 | Encurtar o período para 2020-2022 | — | Descartar o único ano ruim |
 
-O Sharpe honesto de hoje continua **0,16** — e o caminho para ~0,20-0,21 está identificado,
-medido e justificado por mecanismo, não por busca.
+O caminho de ~0,16 para ~0,21 foi percorrido em 24/07 (recomendação 2), **por mecanismo e não
+por busca**. O Sharpe honesto de hoje é **0,21 ± 0,09** — a rodada oficial marca 0,266 porque
+a data de início do config calha de ser uma fase favorável.
+
+O que **continua** não sendo feito de propósito é a lista acima. E a fragilidade da §3 segue
+aberta: espaçar o rebalanceamento **não** removeu a dependência de fase — apenas mudou o
+patamar. Só o *tranching* remove.

@@ -127,8 +127,22 @@ costs:                             # modelo Almgren-Chriss (impacto de mercado)
 
 execution:
   lag_days: 1                      # sinal no close de t -> executa no close de t+1 (anti-lookahead)
-  rebalance_every_days: 3          # decisao a cada 3 dias uteis: coerente com sinal
-                                   # de horizonte ~21d (score quase nao muda em 1 dia)
+  rebalance_every_days: 10         # DECISAO DE CALIBRACAO (24/07): era 3.
+                                   # Base: o canal de CUSTO, nao o Sharpe de uma rodada.
+                                   # Media entre fases de calendario (results/07 s.2.3):
+                                   #   3d  -> bruto 0,499 | custos 211 bps | liq 0,141
+                                   #   5d  -> bruto 0,509 | custos 191 bps | liq 0,172
+                                   #   10d -> bruto 0,516 | custos 168 bps | liq 0,205
+                                   # O alfa BRUTO fica praticamente constante (o sinal tem
+                                   # meia-vida ~21d, nao se perde ao segurar mais tempo) e
+                                   # os custos caem monotonicamente -> o liquido sobe por
+                                   # aritmetica, nao por sorte. Ganho real ~ +0,06.
+                                   # NAO foi escolhido o valor de maior Sharpe: a fase
+                                   # 2020-01-03 dava 0,341 e foi descartada como ruido de
+                                   # calendario. Ver results/07.
+                                   # RESSALVA EM ABERTO: girar 100% do book de uma vez
+                                   # mantem a dependencia de fase (+-0,09). A correcao e
+                                   # tranching (girar ~10% todo dia) -- nao implementado.
 
 hedge:
   enabled: true

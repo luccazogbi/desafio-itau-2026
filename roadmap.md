@@ -176,35 +176,43 @@ beta com **SPY**. Sinal oficial: **`resid_ou`** (reversão de resíduo, Avellane
 
 ## 4. Backtest & Validação
 
-> **Rodada oficial vigente: 23/07/2026** (`reports/sp500_dev_val/`, seção 7 do notebook).
-> Substitui a de 15/07 após as correções de 22/07 e a calibração de custos de 23/07.
+> **Rodada oficial vigente: 24/07/2026** (`reports/sp500_dev_val/`, seção 7 do notebook).
+> Substitui a de 23/07 após a decisão de `rebalance_every_days` 3 → 10.
 >
-> **Sharpe bruto 0,51 / líquido 0,16** · turnover 15,6×/ano · custos **211 bps/ano**
-> (impacto 60% · spread 30% · **aluguel do short 9,5%**) · P&L líq. US$ 38,3mm ·
-> gross 0,999 (**1,012 com hedge**) · |net| 0,002 (**0,022 com hedge**) ·
-> |net setorial| = 0,050 (no limite, restrição **ativa**).
+> **Sharpe bruto 0,57 / líquido 0,27** · turnover 11,0×/ano · custos **168 bps/ano**
+> (impacto 61% · spread 26% · **aluguel do short 12%**) · P&L líq. US$ 59,3mm ·
+> gross 0,999 (**1,012 com hedge**) · |net| 0,002 (**0,042 com hedge**) ·
+> |net setorial| = 0,050 (no limite, restrição **ativa**) · max DD −7,9%.
 >
-> **Por que caiu de 0,20 para 0,16** — duas causas de tamanho parecido:
-> **(1) −0,021 do alfa BRUTO** (0,532 → 0,511), efeito da mudança de painel (688 → 665
-> tickers + rótulos de setor de outro snapshot); os dois mudaram juntos e **não foram
-> isolados** — o painel antigo não foi versionado.
-> **(2) −0,021 dos custos** (+12,5 bps/ano): aluguel do short +20,0, hedge +1,3,
-> impacto +4,3, spread **−13,1** pela calibração. Metade da queda é custo que sempre
-> existiu e não estava sendo cobrado.
+> ⚠️ **O número honesto é 0,21 ± 0,09, não 0,27.** O resultado depende da data de início:
+> deslocando só ela, o Sharpe vai de **0,077 a 0,341**. A rodada oficial (início 2020-01-02,
+> fixado a priori pelo warm-up dos betas) caiu no lado **favorável** — e a tabela de fases de
+> `results/07` §2.2 já previa exatamente 0,568/0,266 para essa data, reproduzindo ao centavo.
+> Sempre reportar o 0,27 com a banda ao lado.
+>
+> **Por que subiu de 0,16 para 0,27:** custos caíram 43 bps/ano (211 → 168) ao girar 3×
+> menos vezes — esse é o mecanismo, e vale **+0,06** na média entre fases. O resto (+0,05) é
+> a fase favorável.
+>
+> **Custos colaterais registrados:** |net| com hedge dobrou (0,022 → 0,042) e a participação
+> típica no ADV mais que dobrou (0,47% → 1,10%). Nenhum viola o mandato; os dois consomem
+> folga.
 >
 > *Medição à parte:* uma rodada intermediária saiu com a restrição setorial **inativa**
-> (sem rodar o `scripts/07b` os setores viram todos `"Unknown"`) e deu 0,220 — o que
-> quantifica o custo do controle setorial em **−0,06**. Mas isso **não explica** a queda
-> acima: a restrição já estava ativa em 15/07.
+> (sem rodar o `scripts/07b` os setores viram todos `"Unknown"`) e deu 0,220 contra 0,160 —
+> quantifica o custo do controle setorial em **−0,06**.
 >
-> Calibração a priori feita UMA vez (α=3bps/z ≈ IC×vol_idio; rebalance a cada 3d) — sem
-> caça ao Sharpe. Nota: max_abs_factor_expo alto (0,59) é ARTEFATO de medição na crise
-> COVID (betas re-estimados explodem em mar-abr/2020); no dia a dia |expo_mkt| ~0,015.
+> Calibração a priori feita UMA vez (α=3bps/z ≈ IC×vol_idio). O `rebalance_every_days = 10`
+> foi decidido em 24/07 **pelo canal de custo**, não pelo Sharpe de uma rodada — se fosse
+> pelo Sharpe teríamos escolhido a fase 2020-01-03 e reportado 0,341. Nota:
+> max_abs_factor_expo alto (0,60) é ARTEFATO de medição na crise COVID (betas re-estimados
+> explodem em mar-abr/2020); no dia a dia |expo_mkt| ~0,015, e a tolerância adaptativa foi
+> acionada em 33 de 1.006 dias.
 - [x] **Backtest oficial do `resid_ou`** no S&P 500 as-of (dev+val; holdout trancado)
 - [x] Métricas: Sharpe líquido, turnover, drawdown, decomposição de custos (gross → net)
 - [x] Confirmar neutralidade de fatores + SETORIAL e hedge SPY nos dados reais
 - [x] **Análise de capacidade** (18/07, `scripts/11`, `results/02`): backtest re-rodado em
-      5 tamanhos — Sharpe líq. **0,33** ($100mm) → **0,16** ($1bi), monotônico. Faixa sustentável:
+      5 tamanhos — Sharpe líq. **0,41** ($100mm) → **0,27** ($1bi), monotônico. Faixa sustentável:
       **$100–300mm**; em books pequenos o piso de custo vira o SPREAD (alavanca = reduzir giro)
 - [x] **Análise de regime de volatilidade** (18/07, `scripts/12`, `results/03`): IC por tercil
       de vol do SPY = **−0,00 / +0,06 / +0,08** (baixa/média/ALTA) → 2023 foi REGIME, não
@@ -228,8 +236,12 @@ beta com **SPY**. Sinal oficial: **`resid_ou`** (reversão de resíduo, Avellane
   - **Fragilidade descoberta:** o resultado depende de em que dia se começa a operar.
     Causa: giramos 100% do book de uma vez. Correção proposta: **tranching** (girar ~10%
     todo dia). Não implementado — exige mudar o agendamento do motor.
-- [ ] **DECISÃO PENDENTE:** `rebalance_every_days` 3 → 10 (+0,06 esperado). Não alterado —
-      move todos os números do relatório.
+- [x] **DECIDIDO em 24/07:** `rebalance_every_days` **3 → 10**. Base: o **canal de custo**
+      (bruto praticamente constante entre fases, custos caindo monotonicamente 211 → 168
+      bps), não o Sharpe de uma rodada. Ganho atribuível ao mecanismo: **+0,06**. Todos os
+      números do projeto foram regerados (02, 05, 11, 12, 14, 15, 17 + notebook).
+      ⚠️ A rodada oficial marca **0,266**, mas a expectativa honesta é **0,205 ± 0,09** — a
+      data de início do config é uma fase favorável. Ver `results/07` §4.
 - [ ] (proposto) Implementar **tranching** — elimina a dependência de fase sem mexer no Sharpe médio
 - [ ] Crosscheck `bt` nos dados reais
 - [ ] Ida única ao **holdout** (2024+) — número final da estratégia
@@ -238,7 +250,9 @@ beta com **SPY**. Sinal oficial: **`resid_ou`** (reversão de resíduo, Avellane
 ## 5. Otimização & Custos — calibração final
 
 - [x] Restrição de **neutralidade setorial** no otimizador (|net por setor| ≤ 5%) + setores reais no painel
-- [x] Calibração a priori de `alpha_bps_per_z` (3) e `rebalance_every_days` (3) — justificadas, sem grid search
+- [x] Calibração a priori de `alpha_bps_per_z` (3) — justificada, sem grid search.
+      `rebalance_every_days` foi a priori 3 e passou a **10** em 24/07, por evidência do
+      canal de custo (não por busca de Sharpe) — ver `results/07` §4.
 - [x] **Calibrar η, γ e spread com ADV/volatilidade reais do S&P 500** (23/07,
       `scripts/14` + `scripts/07d`, interpretação em
       [`results/05`](results/05_calibracao_custos.md)). Resultado: **só o spread era
