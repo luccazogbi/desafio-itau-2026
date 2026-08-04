@@ -109,7 +109,8 @@ results/              <- analises interpretadas (01 backtest | 02 capacidade
                          03 regime | 04 auditoria de membership | 05 custos
                          06 multi-periodo GP vs heuristica | 07 elevar o Sharpe
                          08 deslistamento ausente no backtest)
-docs/                 <- genai_log.md | arquivo/ (documentos historicos)
+docs/                 <- genai_log.md | conceitos/ (notas teoricas: custos de execucao)
+                         arquivo/ (documentos historicos)
 considerações/        <- justificativas metodologicas (universo, vieses)
 data/ reports/        <- gerados pelos scripts (fora do git)
 ```
@@ -142,3 +143,4 @@ data/ reports/        <- gerados pelos scripts (fora do git)
 | Validação independente da composição | **em aberto** (S&P bloqueia acesso) | `results/04` |
 | Números 18%/46% do estudo de deslistadas | **não re-deriváveis** hoje (`scripts/08` depende de um pickle que nenhum script gera) | `considerações/` |
 | `horizon_days = 21` não é validado pela meia-vida medida | a medição não é independente (janela de 60d) | `results/06` §2 |
+| Impacto de mercado é **custo debitado**, não preço realimentado | correto p/ o temporário; ignora auto-impacto do permanente entre rebalanceamentos (mitigado pelo cap de 5% do ADV) | `docs/conceitos/custos_de_execucao.md` §6 |
