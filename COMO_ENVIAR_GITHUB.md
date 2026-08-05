@@ -1,8 +1,32 @@
 # 📤 Como enviar o projeto para o GitHub (guia de bolso)
 
-> Repositório: **https://github.com/luccazogbi/Quant** (privado)
+> Repositório: **https://github.com/luccazogbi/Desafio-Quant-2026** (privado)
+> Pasta local: `C:\Users\Lucca\Desktop\Quant\Desafio Quant\quant_ai_2026`
 > Tudo já está configurado (remote, identidade, .gitignore). Este guia é o passo a passo
 > para o dia a dia, sem depender de ninguém.
+
+---
+
+## ⚠️ Antes de tudo: você tem DOIS repositórios
+
+Eles ficam em pastas vizinhas e é fácil commitar no lugar errado (já aconteceu).
+
+| Pasta | Repositório | O que é |
+|---|---|---|
+| `Desktop\Quant\Desafio Quant\quant_ai_2026` | **Desafio-Quant-2026** | a estratégia do desafio Itaú |
+| `Desktop\Quant\Quant Learning` | **quant-studies** | material de estudo (Grinold, Fama-French) |
+
+> A pasta `Desktop\Quant\Project - Lucas Abbade\FinRL-Meta` também é um repo git, mas
+> **não é seu** — é um clone do projeto open-source da AI4Finance. Não tente dar push lá.
+
+**Na dúvida, confira antes de commitar:**
+
+```powershell
+git remote get-url origin
+```
+
+Se responder `Desafio-Quant-2026`, você está no repo da estratégia. Se responder
+`quant-studies`, está no de estudos.
 
 ---
 
@@ -12,7 +36,7 @@ Abra o **PowerShell** e rode, linha por linha:
 
 ```powershell
 # 1. entrar na pasta do projeto
-cd "C:\Users\lucca\OneDrive\Área de Trabalho\Quant-main\Quant-main"
+cd "C:\Users\Lucca\Desktop\Quant\Desafio Quant\quant_ai_2026"
 
 # 2. ver o que mudou (opcional, mas bom hábito)
 git status
@@ -29,6 +53,10 @@ git push
 
 Pronto. Se aparecer uma janela do navegador pedindo login do GitHub, faça o login
 normalmente (é o Git Credential Manager — só acontece de vez em quando).
+
+> **Você é dono do repo, então não precisa de Pull Request.** Commit direto na `main` é o
+> fluxo certo aqui. Se por acidente aparecer a opção "Create PR" no chat, ela só está
+> avisando que existe trabalho não commitado — resolva commitando, não abrindo PR.
 
 ### Exemplos de mensagens de commit boas
 
@@ -54,6 +82,11 @@ O arquivo `.gitignore` já cuida disso automaticamente:
 
 Você **não precisa fazer nada** para excluir essas pastas — o `git add -A` já as ignora.
 
+> **Atenção ao lado ruim disso:** como `reports/` não sobe, quem clonar o repo (ou você
+> mesmo, em outra máquina) **não recebe os artefatos das rodadas**. Eles precisam ser
+> regenerados pelos scripts. Já houve confusão por causa disso: arquivos velhos de uma
+> rodada sintética ficaram em `reports/` fingindo ser resultado real.
+
 ---
 
 ## Situações comuns
@@ -76,7 +109,7 @@ git commit --amend -m "mensagem corrigida"
 
 ### "O push foi rejeitado (rejected / fetch first)"
 Significa que o GitHub tem algo que você não tem localmente (ex.: editou um arquivo
-pelo site). Traga primeiro, depois envie:
+pelo site, ou mergeou uma PR por lá). Traga primeiro, depois envie:
 ```powershell
 git pull --rebase
 git push
@@ -87,12 +120,20 @@ git push
 git log --oneline -10
 ```
 
+### "Sobrou uma branch antiga que eu não uso mais"
+```powershell
+git branch -d nome-da-branch                 # apaga a local
+git push origin --delete nome-da-branch      # apaga a do GitHub
+```
+
 ---
 
 ## Avisos que podem aparecer (e são inofensivos)
 
 - **`warning: LF will be replaced by CRLF`** → normalização de fim de linha do Windows. Ignorar.
 - **Janela de login do GitHub** → autentique uma vez; fica salvo para os próximos pushes.
+- **`remote: This repository moved`** → o repo foi renomeado e o redirecionamento funcionou.
+  Se aparecer, vale corrigir o endereço com `git remote set-url origin <URL nova>`.
 
 ## Sinais de alerta (aí sim, cuidado)
 
@@ -101,13 +142,22 @@ git log --oneline -10
   `.gitignore`; NÃO force o push, rode `git status` e me chame.
 - **`CONFLICT` durante o pull** → o mesmo trecho foi editado em dois lugares;
   se não souber resolver, me chame (não apague nada).
+- **Commit no repositório errado** → confira com `git remote get-url origin` antes.
 
 ---
 
 ## Colinha final (o combo completo em uma linha)
 
+**Desafio (estratégia):**
 ```powershell
-cd "C:\Users\lucca\OneDrive\Área de Trabalho\Quant-main\Quant-main"; git add -A; git commit -m "SUA MENSAGEM AQUI"; git push
+cd "C:\Users\Lucca\Desktop\Quant\Desafio Quant\quant_ai_2026"; git add -A; git commit -m "SUA MENSAGEM AQUI"; git push
 ```
 
-*Criado em 14/07/2026. Se a pasta do projeto mudar de lugar, só o `cd` da linha 1 muda — o resto é idêntico.*
+**Estudos:**
+```powershell
+cd "C:\Users\Lucca\Desktop\Quant\Quant Learning"; git add -A; git commit -m "SUA MENSAGEM AQUI"; git push
+```
+
+*Criado em 14/07/2026 · atualizado em 05/08/2026 (caminhos novos após a saída do OneDrive,
+repos renomeados para `Desafio-Quant-2026` e `quant-studies`, e o segundo repo documentado).
+Se a pasta mudar de lugar, só o `cd` muda — o resto é idêntico.*
