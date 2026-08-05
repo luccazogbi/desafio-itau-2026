@@ -109,7 +109,7 @@ beta com **SPY**. Sinal oficial: **`resid_ou`** (reversão de resíduo, Avellane
 
 ## 3. Sinal de Alfa — decidido por evidência
 
-- [ ] Verificar sinais de alfa da literatura para o novo modelo de estratégia que estamos buscando (Big Caps - S&P 500)
+- [x] Verificar sinais de alfa da literatura para o novo modelo de estratégia que estamos buscando (Big Caps - S&P 500)
   > Pesquisa 14/07 (Claude): 3 candidatos implementados e TESTADOS no funil
   > (dev/val, S&P 500 as-of). Veredito: **NENHUM agrega — blend segue descartado.**
   > **Re-medido em 24/07 no painel atual, com t Newey-West** (os números de 14/07 eram t
