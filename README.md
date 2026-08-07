@@ -9,7 +9,7 @@ custos de execução **Almgren-Chriss**, hedge de beta com **SPY**.
 (Avellaneda & Lee, 2010), escolhido por evidência num funil de 11 candidatos
 com splits dev/validação/holdout.
 
-> 🔴 **O sinal foi REPROVADO no holdout (04/08/2026).** IC de +0,036 na validação virou
+> 🔴 **O sinal foi REPROVADO no holdout (07/08/2026).** IC de +0,036 na validação virou
 > **−0,030** fora da amostra, e o Sharpe líquido de +0,27 virou **−1,15**. Veredito completo em
 > [`results/09`](results/09_holdout_o_veredito.md). O que este repositório entrega hoje é a
 > **infraestrutura de pesquisa e o protocolo que detectou o sobreajuste** — não uma estratégia
@@ -64,7 +64,7 @@ $py = "$env:USERPROFILE\.venvs\quant_ai_2026\Scripts\python.exe"
 # backtest.end = 2023-12-31 e o motor RECUSA passar de holdout_start sem flag.
 & $py scripts\02_run_backtest.py --tag sp500_dev_val
 
-# HOLDOUT -- JA FOI GASTO em 04/08/2026 (ida unica). Reproduz o veredito:
+# HOLDOUT -- JA FOI GASTO em 07/08/2026 (ida unica). Reproduz o veredito:
 & $py scripts\02_run_backtest.py --tag holdout --bt-start 2024-01-02 --bt-end 2026-05-29 --allow-holdout
 & $py scripts\04_signal_funnel.py resid_ou --include-holdout
 & $py scripts\19_holdout_diagnostico.py       # regime vs decaimento
@@ -80,7 +80,7 @@ $py = "$env:USERPROFILE\.venvs\quant_ai_2026\Scripts\python.exe"
 
 ## ⚠️ Resultado final: o sinal NÃO sobreviveu ao holdout
 
-**A ida única ao holdout foi feita em 04/08/2026.** Veredito em
+**A ida única ao holdout foi feita em 07/08/2026.** Veredito em
 [`results/09`](results/09_holdout_o_veredito.md).
 
 | | dev+val (2020-23) | **HOLDOUT (2024-26)** |
@@ -124,6 +124,7 @@ scripts/              <- 00 sintetico | 02 backtest | 04 funil | 05 notebook
                          16 snapshot do painel | 17 auditoria de deslistamento
                          18 sensibilidade a cobertura de precos
                          19 diagnostico do holdout (regime vs decaimento)
+                         20 gera o RELATORIO FINAL (5 pgs 16:9) dos artefatos
                          legados: 01 Bloomberg (aguarda acesso) | 03 crosscheck bt
                                   06 proxy R2000 (substituido pelo 07)
 snapshots/            <- manifestos (hash SHA-256 de cada parquet) -- VERSIONADOS.
@@ -134,7 +135,7 @@ results/              <- analises interpretadas (01 backtest | 02 capacidade
                          06 multi-periodo GP vs heuristica | 07 elevar o Sharpe
                          08 deslistamento ausente | 09 HOLDOUT: o veredito)
 docs/                 <- genai_log.md | conceitos/ (notas teoricas: custos de execucao)
-                         arquivo/ (documentos historicos)
+                         assets/ (identidade visual do robo) | arquivo/ (historicos)
 considerações/        <- justificativas metodologicas (universo, vieses)
 data/ reports/        <- gerados pelos scripts (fora do git)
 ```

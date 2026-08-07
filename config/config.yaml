@@ -23,7 +23,7 @@ backtest:
                                    #   flags entrar no holdout por acidente.
   holdout_start: "2024-01-01"      # daqui p/ frente e HOLDOUT.
                                    #
-                                   # >>> A IDA UNICA JA FOI GASTA em 04/08/2026. <<<
+                                   # >>> A IDA UNICA JA FOI GASTA em 07/08/2026. <<<
                                    #
                                    # Resultado: Sharpe bruto -0,77 | liquido -1,15 |
                                    # IC21 -0,030 (era +0,036 na validacao). O sinal INVERTEU.

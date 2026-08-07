@@ -449,7 +449,7 @@ A **forma** monotônica — que é a conclusão — não mudou.
 | Validação independente da composição | S&P Global bloqueia (HTTP 403); rota: IVV via SEC EDGAR |
 | Tornar `scripts/08` reproduzível | falta o passo de download N-PORT |
 | Condicionar exposição ao regime de vol | só vale se **pré-registrado** e testado no holdout |
-| **Ida ao holdout (2024+)** | ✅ **FEITA em 04/08/2026** — o sinal foi **reprovado** (ver abaixo) |
+| **Ida ao holdout (2024+)** | ✅ **FEITA em 07/08/2026** — o sinal foi **reprovado** (ver abaixo) |
 
 ### Nota de 24/07 — `rebalance_every_days` 3 → 10, adotado
 
@@ -504,7 +504,7 @@ de 2023-12-29, e o motor agora recusa fazê-lo sem flag explícita.
 
 ---
 
-## 10.2 Epílogo de 04/08/2026 — o holdout reprovou o sinal
+## 10.2 Epílogo de 07/08/2026 — o holdout reprovou o sinal
 
 Este documento inteiro descreve o esforço de tornar o resultado de dev+val **correto**. Ele
 conseguiu: os números ficaram mais honestos e mais defensáveis a cada correção.

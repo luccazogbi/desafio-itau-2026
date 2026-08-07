@@ -1,6 +1,6 @@
 # A ida única ao holdout — o sinal não sobreviveu
 
-> **Executado em 04/08/2026**, com autorização explícita do responsável pelo projeto.
+> **Executado em 07/08/2026**, com autorização explícita do responsável pelo projeto.
 > **Janela:** 2024-01-02 a 2026-05-29 · 604 dias úteis · 2,40 anos · 503 membros/dia
 > **Artefatos:** `reports/holdout/` · `reports/completo/` · `reports/holdout_diagnostico.md` ·
 > `reports/funnel_resid_ou.md` · scripts `02` (`--allow-holdout`), `04` (`--include-holdout`), `18`

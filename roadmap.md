@@ -7,7 +7,7 @@ beta com **SPY**. Sinal oficial: **`resid_ou`** (reversão de resíduo, Avellane
 **Como usar:** marque `- [x]` ao concluir. `[x]` = feito · `[ ]` = pendente.
 **Prazos:** pré-relatório **31/07/2026** · entrega final **17/08/2026** (PDF 16:9, máx. 5 páginas, anônimo).
 
-> # 🔴 HOLDOUT GASTO EM 04/08/2026 — O SINAL FOI REPROVADO
+> # 🔴 HOLDOUT GASTO EM 07/08/2026 — O SINAL FOI REPROVADO
 >
 > | | dev+val | **holdout (2024-26)** |
 > |---|---:|---:|
@@ -262,7 +262,7 @@ beta com **SPY**. Sinal oficial: **`resid_ou`** (reversão de resíduo, Avellane
       data de início do config é uma fase favorável. Ver `results/07` §4.
 - [ ] (proposto) Implementar **tranching** — elimina a dependência de fase sem mexer no Sharpe médio
 - [ ] Crosscheck `bt` nos dados reais
-- [x] **Ida única ao holdout (2024+) — FEITA em 04/08/2026, com autorização explícita.**
+- [x] **Ida única ao holdout (2024+) — FEITA em 07/08/2026, com autorização explícita.**
       Resultado: Sharpe bruto **−0,77**, líquido **−1,15**, IC21 **−0,030**, P&L **−US$ 122mm**.
       O sinal inverteu. A defesa por regime não se sustenta (IC negativo nos 3 regimes,
       inclusive vol alta). Diagnóstico reprodutível: `scripts/19_holdout_diagnostico.py`.

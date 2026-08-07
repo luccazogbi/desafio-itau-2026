@@ -1,7 +1,7 @@
 """DIAGNOSTICO DO HOLDOUT: o alfa morreu, ou o regime nao apareceu?
 
 CONTEXTO: a ida unica ao holdout (2024-01-02 a 2026-05-29) foi feita em
-04/08/2026 com autorizacao explicita. Resultado: Sharpe liquido -1,15 e,
+07/08/2026 com autorizacao explicita. Resultado: Sharpe liquido -1,15 e,
 o que mais importa, Sharpe BRUTO -0,77 e IC21 -0,030. O sinal nao apenas
 parou de funcionar -- ele INVERTEU.
 

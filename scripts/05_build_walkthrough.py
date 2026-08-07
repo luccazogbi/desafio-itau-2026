@@ -700,7 +700,7 @@ custos Almgren-Chriss → execução t+1 → hedge SPY → P&L dia a dia.
 
 **Janela: 2020 → 2023 (dev+validação).**
 
-> 🔴 **A ida única ao holdout foi feita em 04/08/2026 — e o sinal foi REPROVADO.**
+> 🔴 **A ida única ao holdout foi feita em 07/08/2026 — e o sinal foi REPROVADO.**
 > Em 2024-2026: Sharpe bruto **−0,77**, líquido **−1,15**, IC21 **−0,030** (era +0,036 na
 > validação). O sinal **inverteu**, e como o bruto também é negativo, não é problema de custo.
 > Leia os resultados abaixo como o retrato de um alfa **sobreajustado antes de ser testado**.
@@ -886,7 +886,7 @@ md("""
    removeu essa dependência — só o tranching remove (`results/07` §3);
 2. **Crosscheck `bt` nos dados reais** e validação independente da composição
    (IVV via SEC EDGAR N-PORT);
-3. ~~Ida única ao holdout~~ — **FEITA em 04/08/2026: o sinal foi reprovado** (Sharpe líquido
+3. ~~Ida única ao holdout~~ — **FEITA em 07/08/2026: o sinal foi reprovado** (Sharpe líquido
    −1,15, IC −0,030). O holdout está **gasto**: qualquer parâmetro ajustado a partir de agora
    é in-sample. Avaliar um sinal novo exige um **holdout novo**;
 4. **Ampliar a amostra para trás** (CRSP/Bloomberg, pré-2018) — é a única forma de distinguir

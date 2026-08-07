@@ -1,6 +1,6 @@
 # Duas tentativas de elevar o Sharpe — uma falhou, a outra revelou uma fragilidade
 
-> 🔴 **Contexto de 04/08/2026:** o holdout mostrou que **não havia Sharpe a elevar** — o sinal
+> 🔴 **Contexto de 07/08/2026:** o holdout mostrou que **não havia Sharpe a elevar** — o sinal
 > entrega −1,15 fora da amostra (`results/09`). As análises abaixo continuam metodologicamente
 > corretas e o teste de fase segue sendo o achado mais útil do documento: ele mostrou que
 > **±0,09 do "alfa" era sorte de calendário**, o que, em retrospecto, foi um dos avisos de que
@@ -230,7 +230,7 @@ O caminho de ~0,16 para ~0,21 foi percorrido em 24/07 (recomendação 2), **por 
 por busca**. O Sharpe de dev+val ficou em **0,21 ± 0,09** — a rodada oficial marca 0,266 porque
 a data de início do config calha de ser uma fase favorável.
 
-> **Epílogo (04/08/2026).** No holdout esse 0,21 virou **−1,15**. A disciplina deste documento
+> **Epílogo (07/08/2026).** No holdout esse 0,21 virou **−1,15**. A disciplina deste documento
 > — rejeitar três melhorias tentadoras, exigir mecanismo em vez de número, expor a dependência
 > de calendário — estava certa e não foi suficiente: ela protegeu contra *falsas melhorias*,
 > mas não contra o fato de que **o alfa de base já era sobreajuste**. Nenhuma quantidade de

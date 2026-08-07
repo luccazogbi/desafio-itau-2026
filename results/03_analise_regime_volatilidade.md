@@ -2,7 +2,7 @@
 
 > # 🔴 ESTE DOCUMENTO FOI FALSEADO PELO HOLDOUT
 >
-> **Atualizado em 04/08/2026.** A tese abaixo — *"o alfa some na calmaria e aparece no
+> **Atualizado em 07/08/2026.** A tese abaixo — *"o alfa some na calmaria e aparece no
 > estresse"* — foi construída em dev+val e **não sobreviveu ao teste fora da amostra**.
 >
 > No holdout (2024-2026) o IC do sinal é **negativo nos três regimes**:
@@ -118,7 +118,7 @@ de um alocador tende a sofrer (vol alta).
 
 ---
 
-## 4. Epílogo (04/08/2026): a ressalva 3 estava certa
+## 4. Epílogo (07/08/2026): a ressalva 3 estava certa
 
 O item acima dizia que "regime" e "ano" podiam estar se confundindo, e que mais história
 fortaleceria a leitura. **O holdout mostrou que a ressalva era o ponto principal, não um
