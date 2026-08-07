@@ -1,5 +1,11 @@
 # Análise do backtest — `resid_ou` no S&P 500 as-of (dev + validação)
 
+> 🔴 **Este documento descreve o dev+val, que NÃO se confirmou fora da amostra.**
+> No holdout (2024-2026) o Sharpe líquido foi **−1,15** e o IC do sinal **−0,030**.
+> Todos os números abaixo continuam corretos para 2020-2023 — e é justamente por isso que
+> valem como registro: eles mostram o que um resultado sobreajustado parece **antes** de ser
+> testado. Veredito em [`results/09`](09_holdout_o_veredito.md).
+
 > **Rodada:** 2020-01-02 → 2023-12-29 · book $1 bi dollar-neutral · holdout (2024+) **trancado**
 > **Artefatos:** `reports/sp500_dev_val/` · **Notebook:** seção 7 do `pipeline_walkthrough.ipynb`
 > **Atualizado em 24/07/2026** — `rebalance_every_days` passou de **3 para 10** (decisão de

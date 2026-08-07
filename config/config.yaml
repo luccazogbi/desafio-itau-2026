@@ -21,9 +21,21 @@ backtest:
   end: "2023-12-31"                # FIM DE DEV+VALIDACAO -- default deliberado.
                                    #   Antes era 2024-12-31, o que fazia uma rodada sem
                                    #   flags entrar no holdout por acidente.
-  holdout_start: "2024-01-01"      # daqui p/ frente e HOLDOUT: UMA unica ida, so com
-                                   #   --allow-holdout explicito. O motor recusa rodar
-                                   #   alem desta data sem a flag (guarda em engine.py).
+  holdout_start: "2024-01-01"      # daqui p/ frente e HOLDOUT.
+                                   #
+                                   # >>> A IDA UNICA JA FOI GASTA em 04/08/2026. <<<
+                                   #
+                                   # Resultado: Sharpe bruto -0,77 | liquido -1,15 |
+                                   # IC21 -0,030 (era +0,036 na validacao). O sinal INVERTEU.
+                                   # Veredito completo em results/09_holdout_o_veredito.md.
+                                   #
+                                   # A trava do motor (engine.py) FICA NO LUGAR de proposito:
+                                   # ela agora protege contra o erro oposto -- ajustar
+                                   # parametros olhando para 2024-2026. Qualquer calibracao
+                                   # feita a partir daqui e IN-SAMPLE e nao significa nada.
+                                   # Nao remova a guarda; nao use --allow-holdout para
+                                   # "testar uma ideia nova". Para isso e preciso um holdout
+                                   # NOVO (outro periodo ou outra fonte de dados).
 
 universe:
   min_price: 1.0                   # evita penny stocks

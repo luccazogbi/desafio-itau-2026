@@ -5,9 +5,15 @@ Arbitragem estatística *long-short* no **S&P 500 com composição histórica as
 neutro aos fatores **FF5+Momentum** e a **setores**, otimização convexa (**cvxpy**),
 custos de execução **Almgren-Chriss**, hedge de beta com **SPY**.
 
-**Sinal oficial:** `resid_ou` — reversão à média do resíduo idiossincrático
+**Sinal testado:** `resid_ou` — reversão à média do resíduo idiossincrático
 (Avellaneda & Lee, 2010), escolhido por evidência num funil de 11 candidatos
 com splits dev/validação/holdout.
+
+> 🔴 **O sinal foi REPROVADO no holdout (04/08/2026).** IC de +0,036 na validação virou
+> **−0,030** fora da amostra, e o Sharpe líquido de +0,27 virou **−1,15**. Veredito completo em
+> [`results/09`](results/09_holdout_o_veredito.md). O que este repositório entrega hoje é a
+> **infraestrutura de pesquisa e o protocolo que detectou o sobreajuste** — não uma estratégia
+> que funciona.
 
 > 📓 **Documento vivo do projeto**: [notebooks/pipeline_walkthrough.ipynb](notebooks/pipeline_walkthrough.ipynb)
 > (passo a passo com gráficos; kernel "Python (QuantAI 2026)"; dúvidas em `notebooks/doubts.md`)
@@ -54,9 +60,14 @@ $py = "$env:USERPROFILE\.venvs\quant_ai_2026\Scripts\python.exe"
 & $py scripts\04_signal_funnel.py
 & $py scripts\09_blend_analysis.py
 
-# BACKTEST OFICIAL (dev+val 2020-2023). O holdout e trancado PELO CONFIG:
+# BACKTEST dev+val 2020-2023. O holdout e trancado PELO CONFIG:
 # backtest.end = 2023-12-31 e o motor RECUSA passar de holdout_start sem flag.
 & $py scripts\02_run_backtest.py --tag sp500_dev_val
+
+# HOLDOUT -- JA FOI GASTO em 04/08/2026 (ida unica). Reproduz o veredito:
+& $py scripts\02_run_backtest.py --tag holdout --bt-start 2024-01-02 --bt-end 2026-05-29 --allow-holdout
+& $py scripts\04_signal_funnel.py resid_ou --include-holdout
+& $py scripts\19_holdout_diagnostico.py       # regime vs decaimento
 
 # notebook explicativo (gera + executa com graficos)
 & $py scripts\05_build_walkthrough.py
@@ -67,27 +78,38 @@ $py = "$env:USERPROFILE\.venvs\quant_ai_2026\Scripts\python.exe"
 & $py -m pytest tests -q
 ```
 
-## Resultado atual (dev+val 2020-2023, holdout trancado)
+## ⚠️ Resultado final: o sinal NÃO sobreviveu ao holdout
 
-| | |
-|---|---:|
-| Sharpe bruto / líquido | **+0,57 / +0,27** |
-| **Sharpe líquido, média entre fases** | **+0,21 ± 0,09** ← *o número honesto* |
-| Retorno líquido | +1,49% a.a. (sobre o gross) |
-| Custos | 168 bps/ano (impacto 61% · spread 26% · aluguel do short 12%) |
-| Turnover | 11,0× /ano (one-way) |
-| Max drawdown | −7,9% |
-| Snapshot do painel | `2026-07-23` |
+**A ida única ao holdout foi feita em 04/08/2026.** Veredito em
+[`results/09`](results/09_holdout_o_veredito.md).
 
-> ⚠️ **Por que duas linhas de Sharpe.** O resultado depende de em que dia do calendário se
-> começa a operar: fixando tudo e deslocando só a data inicial, o Sharpe varia de **0,077 a
-> 0,341** (`results/07` §2.2). A data oficial (2020-01-02) foi fixada a priori pelo warm-up
-> dos betas, mas calhou de cair no lado favorável. **A expectativa da estratégia é 0,21, não
-> 0,27.** A correção estrutural (*tranching*) está identificada e não implementada.
+| | dev+val (2020-23) | **HOLDOUT (2024-26)** |
+|---|---:|---:|
+| Sharpe **bruto** | +0,57 | **−0,77** |
+| Sharpe **líquido** | +0,27 | **−1,15** |
+| Retorno líquido a.a. | +1,49% | **−5,09%** |
+| IC do sinal (21d) | +0,036 (val) | **−0,030** |
+| P&L líquido | +US$ 59,3mm | **−US$ 122,1mm** |
 
-Diagnóstico completo em [`results/01`](results/01_analise_backtest_dev_val.md). A curva de
-capacidade ([`results/02`](results/02_analise_capacidade.md)) mostra **0,41 em $100mm** —
-o mandato de $1 bi opera acima do tamanho ótimo da estratégia.
+**O sinal não parou de funcionar — ele inverteu.** O Sharpe **bruto** também é negativo, então
+não é problema de custo ou execução: o alfa virou contra nós antes de qualquer fricção. O IC é
+negativo **em todos os três regimes de volatilidade**, inclusive naquele onde a tese previa
+que fosse mais forte — a defesa por regime não se sustenta.
+
+Não é artefato de dados: a cobertura no holdout é **melhor** (97,6% vs 92,8%).
+
+**Período inteiro (2020-2026, 6,4 anos): Sharpe líquido −0,10, P&L −US$ 32,6mm.**
+
+> **O protocolo funcionou.** O holdout foi lacrado no código antes de qualquer resultado ser
+> conhecido, exatamente para pegar o caso em que a estratégia parece funcionar em dev+val e
+> não funciona fora. Ele pegou. As pistas já estavam no relatório — validação com t = 1,66,
+> dependência de calendário de ±0,09, IC de apenas 0,05 — e nós as subestimamos.
+>
+> **O holdout está gasto.** Qualquer parâmetro ajustado a partir daqui é in-sample.
+
+Diagnóstico do dev+val (histórico) em [`results/01`](results/01_analise_backtest_dev_val.md);
+curva de capacidade em [`results/02`](results/02_analise_capacidade.md). **Ambos descrevem um
+resultado que não se confirmou fora da amostra** — leia-os junto com o `results/09`.
 
 ## Estrutura
 
@@ -100,6 +122,8 @@ scripts/              <- 00 sintetico | 02 backtest | 04 funil | 05 notebook
                          10 kappa | 11 capacidade | 12 regime | 13 auditoria as-of
                          14 calibracao de custos | 15 Garleanu-Pedersen
                          16 snapshot do painel | 17 auditoria de deslistamento
+                         18 sensibilidade a cobertura de precos
+                         19 diagnostico do holdout (regime vs decaimento)
                          legados: 01 Bloomberg (aguarda acesso) | 03 crosscheck bt
                                   06 proxy R2000 (substituido pelo 07)
 snapshots/            <- manifestos (hash SHA-256 de cada parquet) -- VERSIONADOS.
@@ -108,7 +132,7 @@ notebooks/            <- pipeline_walkthrough.ipynb (documento vivo) + doubts.md
 results/              <- analises interpretadas (01 backtest | 02 capacidade
                          03 regime | 04 auditoria de membership | 05 custos
                          06 multi-periodo GP vs heuristica | 07 elevar o Sharpe
-                         08 deslistamento ausente no backtest)
+                         08 deslistamento ausente | 09 HOLDOUT: o veredito)
 docs/                 <- genai_log.md | conceitos/ (notas teoricas: custos de execucao)
                          arquivo/ (documentos historicos)
 considerações/        <- justificativas metodologicas (universo, vieses)
@@ -121,12 +145,12 @@ data/ reports/        <- gerados pelos scripts (fora do git)
    ações **removidas** do índice, só **18%** têm preço no R2000 contra **46%** no S&P 500;
    ver `considerações/`.
 2. **Sinal único `resid_ou`** — funil de 11 candidatos (10 avaliáveis no painel real; o
-   `earnings_yield` exige EPS que o dado gratuito não tem): é o melhor, com IC positivo e
-   consistente nos dois splits (IC21 0,051 dev / 0,036 val). Com t-stat corrigido por
-   Newey-West: **t = 2,50 dev / 1,66 val** — o dev é significativo, a validação não
-   chega a 2. Blend testado 2× e descartado — medido: o blend rende 0,051/0,034 contra
-   0,051/**0,036** do `resid_ou` puro, ou seja **piora a validação**.
-   Evidência completa em `reports/funnel.md` (12 linhas) e `reports/blend_analysis.md`.
+   `earnings_yield` exige EPS que o dado gratuito não tem): foi o melhor, com IC positivo nos
+   dois splits (IC21 0,051 dev / 0,036 val). Com t-stat corrigido por Newey-West:
+   **t = 2,50 dev / 1,66 val** — o dev é significativo, **a validação não chega a 2**.
+   Blend testado 2× e descartado. Evidência em `reports/funnel.md` e `reports/blend_analysis.md`.
+   🔴 **No holdout o IC virou −0,030.** Em retrospecto, o t de 1,66 na validação era o aviso —
+   e nós o reportamos, mas subestimamos (`results/09` §5.2).
 3. **Sem Bloomberg** até etapas futuras do desafio — fontes: Wikipedia/fja05680
    (membership), yfinance (preços), Ken French (fatores), Nasdaq screener (mcap/setor).
 

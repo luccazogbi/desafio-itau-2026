@@ -7,6 +7,24 @@ beta com **SPY**. Sinal oficial: **`resid_ou`** (reversão de resíduo, Avellane
 **Como usar:** marque `- [x]` ao concluir. `[x]` = feito · `[ ]` = pendente.
 **Prazos:** pré-relatório **31/07/2026** · entrega final **17/08/2026** (PDF 16:9, máx. 5 páginas, anônimo).
 
+> # 🔴 HOLDOUT GASTO EM 04/08/2026 — O SINAL FOI REPROVADO
+>
+> | | dev+val | **holdout (2024-26)** |
+> |---|---:|---:|
+> | Sharpe bruto | +0,57 | **−0,77** |
+> | Sharpe líquido | +0,27 | **−1,15** |
+> | IC21 | +0,036 (val) | **−0,030** |
+>
+> O sinal **inverteu**, e o bruto também é negativo — não é custo. IC negativo nos três
+> regimes de vol. Não é artefato de dado (cobertura no holdout é *melhor*: 97,6% vs 92,8%).
+> Período inteiro 2020-2026: Sharpe líquido **−0,10**.
+> Veredito: [`results/09`](results/09_holdout_o_veredito.md).
+>
+> **Consequência para este roadmap:** todo item de calibração/melhoria abaixo está
+> **congelado**. Ajustar qualquer parâmetro agora seria in-sample. O que segue válido é a
+> infraestrutura (painel as-of, motor, funil, snapshot, testes) e os itens que exigem
+> **dados novos**.
+
 > **Decisões-chave já tomadas** (para não reabrir):
 > 1. **Universo = S&P 500**, não Russell 2000. Motivo medido: das ações **removidas** do
 >    índice, só **18%** têm preço no R2000 gratuito, contra **46%** no S&P 500 → survival
@@ -244,7 +262,13 @@ beta com **SPY**. Sinal oficial: **`resid_ou`** (reversão de resíduo, Avellane
       data de início do config é uma fase favorável. Ver `results/07` §4.
 - [ ] (proposto) Implementar **tranching** — elimina a dependência de fase sem mexer no Sharpe médio
 - [ ] Crosscheck `bt` nos dados reais
-- [ ] Ida única ao **holdout** (2024+) — número final da estratégia
+- [x] **Ida única ao holdout (2024+) — FEITA em 04/08/2026, com autorização explícita.**
+      Resultado: Sharpe bruto **−0,77**, líquido **−1,15**, IC21 **−0,030**, P&L **−US$ 122mm**.
+      O sinal inverteu. A defesa por regime não se sustenta (IC negativo nos 3 regimes,
+      inclusive vol alta). Diagnóstico reprodutível: `scripts/19_holdout_diagnostico.py`.
+      Interpretação: [`results/09`](results/09_holdout_o_veredito.md).
+      ⚠️ **O holdout está gasto** — a trava do `engine.py` fica no lugar para impedir
+      calibração in-sample sobre 2024-2026.
 - [ ] (evolução proposta, NÃO retro-ajustar) condicionar gross/rebalance ao regime de vol
 
 ## 5. Otimização & Custos — calibração final

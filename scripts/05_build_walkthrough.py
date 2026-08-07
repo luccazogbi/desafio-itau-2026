@@ -698,8 +698,13 @@ md("""
 oficial — sinal → otimizador (com TODAS as restrições, inclusive a **setorial**) →
 custos Almgren-Chriss → execução t+1 → hedge SPY → P&L dia a dia.
 
-**Janela: 2020 → 2023 (dev+validação). O holdout (2024+) permanece TRANCADO** — será
-usado uma única vez, na decisão final (protocolo anti-overfitting).
+**Janela: 2020 → 2023 (dev+validação).**
+
+> 🔴 **A ida única ao holdout foi feita em 04/08/2026 — e o sinal foi REPROVADO.**
+> Em 2024-2026: Sharpe bruto **−0,77**, líquido **−1,15**, IC21 **−0,030** (era +0,036 na
+> validação). O sinal **inverteu**, e como o bruto também é negativo, não é problema de custo.
+> Leia os resultados abaixo como o retrato de um alfa **sobreajustado antes de ser testado**.
+> Veredito completo em `results/09_holdout_o_veredito.md`.
 
 *Os resultados abaixo são lidos de `reports/sp500_dev_val/` (gerados por
 `scripts/02_run_backtest.py --data processed_sp500 --bt-end 2023-12-31 --tag sp500_dev_val`).*
@@ -866,7 +871,7 @@ md("""
    hoje — ver `considerações/`;*
 3. **Sinal**: `resid_ou` escolhido por evidência (11 candidatos testados no total;
    blend descartado duas vezes por não agregar);
-4. **Backtest oficial dev+val** rodado com mandato completo (seção 7);
+4. **Backtest dev+val** rodado com mandato completo (seção 7) — **e reprovado no holdout**;
 5. **Análise crítica**: capacidade (`results/02`), regime de vol (`results/03`),
    auditoria de composição (`04`), calibração de custos (`05`), multi-período
    Gârleanu-Pedersen (`06`), tentativas de elevar o Sharpe (`07`) e ausência de
@@ -881,8 +886,12 @@ md("""
    removeu essa dependência — só o tranching remove (`results/07` §3);
 2. **Crosscheck `bt` nos dados reais** e validação independente da composição
    (IVV via SEC EDGAR N-PORT);
-3. **Ida única ao holdout** (2024+) — o número final da estratégia;
-4. **Relatório de 5 páginas + robô** (prazos: pré-relatório 31/07, final 17/08).
+3. ~~Ida única ao holdout~~ — **FEITA em 04/08/2026: o sinal foi reprovado** (Sharpe líquido
+   −1,15, IC −0,030). O holdout está **gasto**: qualquer parâmetro ajustado a partir de agora
+   é in-sample. Avaliar um sinal novo exige um **holdout novo**;
+4. **Ampliar a amostra para trás** (CRSP/Bloomberg, pré-2018) — é a única forma de distinguir
+   *"o efeito nunca existiu"* de *"existiu e foi arbitrado"*;
+5. **Relatório de 5 páginas + robô** (entrega final 17/08).
 
 ### 8.3 Glossário
 

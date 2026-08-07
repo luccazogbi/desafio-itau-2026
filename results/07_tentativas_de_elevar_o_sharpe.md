@@ -1,5 +1,11 @@
 # Duas tentativas de elevar o Sharpe — uma falhou, a outra revelou uma fragilidade
 
+> 🔴 **Contexto de 04/08/2026:** o holdout mostrou que **não havia Sharpe a elevar** — o sinal
+> entrega −1,15 fora da amostra (`results/09`). As análises abaixo continuam metodologicamente
+> corretas e o teste de fase segue sendo o achado mais útil do documento: ele mostrou que
+> **±0,09 do "alfa" era sorte de calendário**, o que, em retrospecto, foi um dos avisos de que
+> o resultado era frágil. Leia como registro de método, não como caminho de melhoria.
+
 > **Pergunta:** o que dá para fazer para o Sharpe subir **sem inflar o número**?
 > Duas hipóteses foram testadas: **(1)** filtrar ações pela velocidade de reversão,
 > como no Avellaneda-Lee original; **(2)** reduzir o giro, que na época consumia
@@ -221,9 +227,11 @@ dois **consomem folga** — e é essa folga que permitiria escalar o book.
 | Encurtar o período para 2020-2022 | — | Descartar o único ano ruim |
 
 O caminho de ~0,16 para ~0,21 foi percorrido em 24/07 (recomendação 2), **por mecanismo e não
-por busca**. O Sharpe honesto de hoje é **0,21 ± 0,09** — a rodada oficial marca 0,266 porque
+por busca**. O Sharpe de dev+val ficou em **0,21 ± 0,09** — a rodada oficial marca 0,266 porque
 a data de início do config calha de ser uma fase favorável.
 
-O que **continua** não sendo feito de propósito é a lista acima. E a fragilidade da §3 segue
-aberta: espaçar o rebalanceamento **não** removeu a dependência de fase — apenas mudou o
-patamar. Só o *tranching* remove.
+> **Epílogo (04/08/2026).** No holdout esse 0,21 virou **−1,15**. A disciplina deste documento
+> — rejeitar três melhorias tentadoras, exigir mecanismo em vez de número, expor a dependência
+> de calendário — estava certa e não foi suficiente: ela protegeu contra *falsas melhorias*,
+> mas não contra o fato de que **o alfa de base já era sobreajuste**. Nenhuma quantidade de
+> rigor na calibração salva um sinal que não replica. Ver [`results/09`](09_holdout_o_veredito.md).

@@ -1,6 +1,13 @@
 # Dúvidas
 Esse arquivo é destinado a listar eventuais dúvidas ao longo do estudo do notebook "pipeline_walkthrough.ipynb".
 
+## 0ª Seção - A pergunta que importava
+- [x] O `resid_ou` funciona fora da amostra?
+    R (Claude, 04/08): **Não.** A ida única ao holdout (2024-01-02 a 2026-05-29, 604 dias) foi executada com autorização explícita. Sharpe bruto **−0,77**, líquido **−1,15**, IC21 **−0,030** — era +0,051 no dev e +0,036 na validação. **O sinal não parou de funcionar: inverteu.** Como o Sharpe *bruto* também é negativo, não é problema de custo, execução ou tamanho de book — o alfa virou antes de qualquer fricção.
+    **A defesa por regime foi testada e não se sustenta.** O holdout foi mesmo mais calmo (56% dos dias em vol baixa contra 33% no dev+val), mas o IC é negativo **nos três regimes**, inclusive em vol ALTA (−0,020), que é onde a tese do `results/03` apostava. *Ressalva a favor: só 12 observações em vol alta, t = −0,28 — indistinguível de zero. O correto é "não confirmado", não "refutado".*
+    **Não é artefato de dado:** a cobertura de preços no holdout é **melhor** (97,6% vs 92,8%).
+    Veredito completo em `results/09_holdout_o_veredito.md`. ⚠️ **O holdout está gasto** — qualquer parâmetro ajustado a partir de agora é in-sample.
+
 ## 1ª Seção - Dados
 - [x] Para as ações que fizeram parte do índice S&P 500, desde 1996 até 2026, nós temos acesso a todos os dados de volume/preço?
     R: Não. Começa em 2018

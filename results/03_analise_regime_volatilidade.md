@@ -1,4 +1,30 @@
-# Análise de regime de volatilidade — o alfa depende do regime (e isso é a tese)
+# Análise de regime de volatilidade — o alfa depende do regime (e isso *era* a tese)
+
+> # 🔴 ESTE DOCUMENTO FOI FALSEADO PELO HOLDOUT
+>
+> **Atualizado em 04/08/2026.** A tese abaixo — *"o alfa some na calmaria e aparece no
+> estresse"* — foi construída em dev+val e **não sobreviveu ao teste fora da amostra**.
+>
+> No holdout (2024-2026) o IC do sinal é **negativo nos três regimes**:
+>
+> | Regime | IC dev+val | **IC holdout** |
+> |---|---:|---:|
+> | Vol baixa | +0,000 | **−0,028** |
+> | Vol média | +0,064 | **−0,035** |
+> | **Vol ALTA** | **+0,079** | **−0,020** *(n=12)* |
+>
+> A tese previa IC ≈ 0 na calmaria e IC **forte** em vol alta. O holdout foi de fato mais
+> calmo (56% de dias de vol baixa contra 33%), o que explica *parte* do resultado ruim — mas
+> **o sinal falhou inclusive em vol alta**, que é onde a tese apostava. A defesa por regime
+> **não se sustenta**.
+>
+> *Ressalva a favor do documento:* o holdout teve só **12 observações** em vol alta e o t é
+> −0,28 — estatisticamente indistinguível de zero. O correto é dizer que a tese ficou
+> **não confirmada**, não que foi refutada com força.
+>
+> **Leia este documento como registro histórico do raciocínio que fizemos em dev+val**, e o
+> [`results/09`](09_holdout_o_veredito.md) para o veredito. A escada monotônica abaixo é
+> real nos dados de 2020-2023 — ela simplesmente não se repetiu.
 
 > **Pergunta que motivou:** 2023 foi negativo (Sharpe líq. −0,70). Isso é **decaimento do
 > alfa** (o efeito foi arbitrado) ou **dependência de regime** (o alfa só existe em certos
@@ -89,3 +115,16 @@ de um alocador tende a sofrer (vol alta).
 3. **Cuidado honesto:** com 4 anos de amostra, "regime" e "ano" se confundem em parte.
    A escada monotônica do IC (0 → 0,06 → 0,08) e o mecanismo econômico dão suporte à
    leitura, mas mais história (ampliar o painel para trás) a fortaleceria.
+
+---
+
+## 4. Epílogo (04/08/2026): a ressalva 3 estava certa
+
+O item acima dizia que "regime" e "ano" podiam estar se confundindo, e que mais história
+fortaleceria a leitura. **O holdout mostrou que a ressalva era o ponto principal, não um
+detalhe.** A escada 0 → 0,06 → 0,08 não se repetiu; virou −0,028 / −0,035 / −0,020.
+
+A lição de método que fica: **uma tese que explica bem o passado não é evidência de que ela
+está certa.** A explicação de regime era coerente, econômica e ajustava os dados — e ainda
+assim não previu nada. É exatamente por isso que o holdout existia. Ver
+[`results/09`](09_holdout_o_veredito.md).

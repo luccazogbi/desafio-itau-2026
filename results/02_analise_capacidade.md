@@ -1,5 +1,10 @@
 # Análise de capacidade — o tamanho do book é uma decisão de desenho
 
+> 🔴 **Curva medida em dev+val, que não se confirmou fora da amostra** (holdout: Sharpe
+> líquido −1,15, `results/09`). A **forma** monotônica — mais book, menos Sharpe — é uma
+> propriedade mecânica do custo de impacto e continua válida. Já o **nível** de cada ponto
+> herda o alfa de 2020-2023, que não replicou.
+
 > **Pergunta:** no book oficial de $1 bi, custos comem 63% do alfa. Quanto sobreviveria
 > em books menores? **Método:** o backtest **completo foi re-rodado** em 5 tamanhos
 > (não é aproximação de escala — o otimizador reage ao tamanho: caps de liquidez e

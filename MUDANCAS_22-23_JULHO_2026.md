@@ -449,7 +449,7 @@ A **forma** monotônica — que é a conclusão — não mudou.
 | Validação independente da composição | S&P Global bloqueia (HTTP 403); rota: IVV via SEC EDGAR |
 | Tornar `scripts/08` reproduzível | falta o passo de download N-PORT |
 | Condicionar exposição ao regime de vol | só vale se **pré-registrado** e testado no holdout |
-| **Ida ao holdout (2024+)** | **NÃO FEITO** — segue trancado |
+| **Ida ao holdout (2024+)** | ✅ **FEITA em 04/08/2026** — o sinal foi **reprovado** (ver abaixo) |
 
 ### Nota de 24/07 — `rebalance_every_days` 3 → 10, adotado
 
@@ -501,6 +501,27 @@ backtest oficial: Sharpe 0,160 · snapshot 2026-07-23 · 2020-01-02 a 2023-12-29
 
 **O holdout nunca foi tocado.** Nenhum backtest, IC, sinal ou métrica de desempenho passou
 de 2023-12-29, e o motor agora recusa fazê-lo sem flag explícita.
+
+---
+
+## 10.2 Epílogo de 04/08/2026 — o holdout reprovou o sinal
+
+Este documento inteiro descreve o esforço de tornar o resultado de dev+val **correto**. Ele
+conseguiu: os números ficaram mais honestos e mais defensáveis a cada correção.
+
+**Mas o resultado corrigido também não sobreviveu ao teste fora da amostra.**
+
+| | dev+val | **holdout (2024-26)** |
+|---|---:|---:|
+| Sharpe bruto | +0,57 | **−0,77** |
+| Sharpe líquido | +0,27 | **−1,15** |
+| IC21 | +0,036 (val) | **−0,030** |
+
+A trava de holdout criada na §3.2 deste changelog — a correção que parecia a mais burocrática
+de todas — acabou sendo **a mais importante do projeto**. Ela existia exatamente para o caso
+que se materializou.
+
+Veredito e diagnóstico completos em `results/09_holdout_o_veredito.md`.
 
 ---
 
